@@ -1,0 +1,15 @@
+# PlatformIO
+.pio/
+firmware/.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+.idea/
+.DS_Store
+*.log
+*.bin
+*.elf
+*.map
+secrets.*
+.env
+.env.*
