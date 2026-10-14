@@ -18,7 +18,7 @@ flowchart LR
   PITCH["SG90 PITCH"]
   TTP["TTP223"]
   ESP -- "GPIO10 BCLK + GPIO11 WS" --> MIC
-  ESP -- "GPIO12 MIC_SD (вход)" <---> MIC
+  MIC -- "SD → GPIO12 (через MUTE)" --> ESP
   ESP -- "GPIO10 BCLK + GPIO11 WS + GPIO13 DIN" --> AMP
   AMP -- "SPK+ / SPK−" --> SPK
   ESP --> I2C
