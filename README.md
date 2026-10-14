@@ -47,3 +47,7 @@ python3 -m platformio device monitor -b 115200
 Первые версии принципиально не нуждаются в интернете. API-ключи AI не будут храниться в прошивке ESP32. После аппаратной проверки добавим Wi-Fi, локальное сопряжение и macOS-клиент.
 
 Источники по плате: [официальная документация](https://wiki.lilygo.cc/products/t-display-series/t-display-s3/) и [LILYGO display library](https://github.com/Xinyuan-LILYGO/LilyGo-display-library).
+
+## Электрическая схема прототипа
+
+- [Схема подключения T-Display-S3, микрофона, усилителя, датчиков, PCA9685 и сервоприводов](docs/hardware/WIRING.md) (проектная, ещё не проверена на макете).
