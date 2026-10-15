@@ -1,7 +1,10 @@
 #include <Arduino.h>
-#include "DeskPetTDisplayS3.h"
+#include <stdlib.h>
+#include <string.h>
 
+#include "DeskPetTDisplayS3.h"
 #include "FaceAnimator.h"
+#include "ReactionController.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -11,6 +14,7 @@ constexpr uint32_t kDemoIntervalMs = 1800;
 
 DeskPetTDisplayS3 display;
 FaceAnimator face(display);
+ReactionController reactions;
 
 struct Button {
     explicit Button(uint8_t gpio) : pin(gpio) {}
@@ -22,7 +26,6 @@ struct Button {
         changedAt = millis();
     }
 
-    // Emits one event for each stable press; never blocks the render loop.
     bool pressed(uint32_t nowMs) {
         const bool raw = digitalRead(pin);
         if (raw != lastRaw) {
@@ -31,7 +34,7 @@ struct Button {
         }
         if (nowMs - changedAt >= kDebounceMs && stable != raw) {
             stable = raw;
-            return !stable; // active-low
+            return !stable;
         }
         return false;
     }
@@ -42,94 +45,184 @@ struct Button {
     uint32_t changedAt = 0;
 };
 
+struct NamedEmotion {
+    const char* command;
+    Emotion emotion;
+};
+
+// Single table for Serial mapping. The enum order also defines USER/demo order.
+constexpr NamedEmotion kEmotionCommands[] = {
+    {"neutral", Emotion::Neutral},
+    {"happy", Emotion::Happy},
+    {"curious", Emotion::Curious},
+    {"surprised", Emotion::Surprised},
+    {"sleepy", Emotion::Sleepy},
+    {"angry", Emotion::Angry},
+    {"sad", Emotion::Sad},
+    {"love", Emotion::Love},
+    {"confused", Emotion::Confused},
+    {"excited", Emotion::Excited},
+    {"playful", Emotion::Playful},
+    {"smug", Emotion::Smug},
+    {"furious", Emotion::Furious},
+    {"embarrassed", Emotion::Embarrassed},
+    {"dizzy", Emotion::Dizzy},
+    {"bored", Emotion::Bored},
+};
+static_assert(sizeof(kEmotionCommands) / sizeof(kEmotionCommands[0]) ==
+                  static_cast<uint8_t>(Emotion::Count),
+              "Each emotion needs a Serial command");
+
 Button userButton(kUserButtonPin);
 Button bootButton(kBootButtonPin);
-
-char commandBuffer[40] = {};
+char commandBuffer[48] = {};
 size_t commandLength = 0;
 bool demoEnabled = false;
 uint32_t nextDemoMs = 0;
 
+void syncReaction(uint32_t nowMs) {
+    Emotion next;
+    if (reactions.takeChange(next) && !face.isSleeping()) {
+        face.setEmotion(next, nowMs);
+    }
+}
+
+void showStatus() {
+    Serial.print("Mood: ");
+    Serial.print(emotionName(reactions.desiredEmotion()));
+    Serial.print(" | manual: ");
+    Serial.print(emotionName(reactions.manualEmotion()));
+    Serial.print(" | idle: ");
+    Serial.print(reactions.idleEnabled() ? "on (" : "off (");
+    Serial.print(reactions.idleSeconds());
+    Serial.print("s) | demo: ");
+    Serial.print(demoEnabled ? "on" : "off");
+    Serial.print(" | sass: ");
+    Serial.print(face.sassEnabled() ? "on" : "off");
+    Serial.print(" | sleeping: ");
+    Serial.println(face.isSleeping() ? "yes" : "no");
+}
+
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Commands: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored sleep wake next demo on demo off sass on sass off quip ping help");
-    } else if (strcmp(command, "ping") == 0) {
+        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored");
+        Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip");
+        Serial.println("Reactions: event build-success | event build-failure | idle on | idle off | idle <15..3600 seconds> | status");
+        return;
+    }
+    if (strcmp(command, "ping") == 0) {
         Serial.println("pong");
-    } else if (strcmp(command, "sass on") == 0) {
-        face.setSassEnabled(true, nowMs);
-        Serial.println("Sass ON (censored Russian comic quips; RAM-only).");
         return;
-    } else if (strcmp(command, "sass off") == 0) {
-        face.setSassEnabled(false, nowMs);
-        Serial.println("Sass OFF.");
+    }
+    if (strcmp(command, "status") == 0) {
+        showStatus();
         return;
-    } else if (strcmp(command, "quip") == 0) {
-        Serial.println(face.showQuip(nowMs) ? "Comic quip!" :
-            "Comic quips are disabled: type sass on.");
+    }
+    if (strcmp(command, "sass on") == 0 || strcmp(command, "sass off") == 0) {
+        reactions.activity(nowMs);
+        syncReaction(nowMs);
+        const bool enabled = strcmp(command, "sass on") == 0;
+        face.setSassEnabled(enabled, nowMs);
+        Serial.println(enabled ? "Sass ON (RAM only)" : "Sass OFF");
         return;
-    } else if (strcmp(command, "demo on") == 0) {
-        demoEnabled = true;
-        face.setEmotion(Emotion::Neutral, nowMs);
-        nextDemoMs = nowMs + kDemoIntervalMs;
-        Serial.println("Demo ON: cycling all 16 emotions.");
-        return;
-    } else if (strcmp(command, "demo off") == 0) {
-        demoEnabled = false;
-        Serial.println("Demo OFF.");
-        return;
-    } else if (strcmp(command, "sleep") == 0) {
-        face.setSleeping(true, nowMs);
-    } else if (strcmp(command, "wake") == 0) {
-        face.setSleeping(false, nowMs);
-    } else if (strcmp(command, "next") == 0) {
-        face.nextEmotion(nowMs);
-    } else if (strcmp(command, "neutral") == 0) {
-        face.setEmotion(Emotion::Neutral, nowMs);
-    } else if (strcmp(command, "happy") == 0) {
-        face.setEmotion(Emotion::Happy, nowMs);
-    } else if (strcmp(command, "curious") == 0) {
-        face.setEmotion(Emotion::Curious, nowMs);
-    } else if (strcmp(command, "surprised") == 0) {
-        face.setEmotion(Emotion::Surprised, nowMs);
-    } else if (strcmp(command, "sleepy") == 0) {
-        face.setEmotion(Emotion::Sleepy, nowMs);
-    } else if (strcmp(command, "angry") == 0) {
-        face.setEmotion(Emotion::Angry, nowMs);
-    } else if (strcmp(command, "sad") == 0) {
-        face.setEmotion(Emotion::Sad, nowMs);
-    } else if (strcmp(command, "love") == 0) {
-        face.setEmotion(Emotion::Love, nowMs);
-    } else if (strcmp(command, "confused") == 0) {
-        face.setEmotion(Emotion::Confused, nowMs);
-    } else if (strcmp(command, "excited") == 0) {
-        face.setEmotion(Emotion::Excited, nowMs);
-    } else if (strcmp(command, "playful") == 0) {
-        face.setEmotion(Emotion::Playful, nowMs);
-    } else if (strcmp(command, "smug") == 0) {
-        face.setEmotion(Emotion::Smug, nowMs);
-    } else if (strcmp(command, "furious") == 0) {
-        face.setEmotion(Emotion::Furious, nowMs);
-    } else if (strcmp(command, "embarrassed") == 0) {
-        face.setEmotion(Emotion::Embarrassed, nowMs);
-    } else if (strcmp(command, "dizzy") == 0) {
-        face.setEmotion(Emotion::Dizzy, nowMs);
-    } else if (strcmp(command, "bored") == 0) {
-        face.setEmotion(Emotion::Bored, nowMs);
-    } else if (*command) {
-        Serial.println("Unknown command. Type help.");
+    }
+    if (strcmp(command, "quip") == 0) {
+        Serial.println(face.showQuip(nowMs) ? "Comic quip!" : "Enable it with sass on");
         return;
     }
 
-    if (*command && strcmp(command, "help") != 0 && strcmp(command, "ping") != 0) {
-        // Manual emotion / sleep / wake commands take precedence over the demo.
+    if (strcmp(command, "demo on") == 0) {
+        demoEnabled = true;
+        reactions.chooseEmotion(Emotion::Neutral, nowMs);
+        syncReaction(nowMs);
+        nextDemoMs = nowMs + kDemoIntervalMs;
+        Serial.println("Demo ON: cycling all 16 emotions");
+        return;
+    }
+    if (strcmp(command, "demo off") == 0) {
         demoEnabled = false;
-        Serial.print("State: ");
-        Serial.println(face.isSleeping() ? "sleeping" : "awake");
+        reactions.activity(nowMs);
+        syncReaction(nowMs);
+        Serial.println("Demo OFF");
+        return;
+    }
+
+    if (strcmp(command, "idle on") == 0 || strcmp(command, "idle off") == 0) {
+        reactions.setIdleEnabled(strcmp(command, "idle on") == 0, nowMs);
+        syncReaction(nowMs);
+        Serial.println(reactions.idleEnabled() ? "Idle reactions ON" : "Idle reactions OFF");
+        return;
+    }
+    if (strncmp(command, "idle ", 5) == 0) {
+        char* end = nullptr;
+        const unsigned long seconds = strtoul(command + 5, &end, 10);
+        if (end == command + 5 || *end != '\0' ||
+            seconds < ReactionController::kMinIdleSeconds ||
+            seconds > ReactionController::kMaxIdleSeconds) {
+            Serial.println("Idle timeout must be 15..3600 seconds");
+            return;
+        }
+        reactions.setIdleSeconds(static_cast<uint32_t>(seconds), nowMs);
+        syncReaction(nowMs);
+        Serial.print("Idle timeout set to ");
+        Serial.print(seconds);
+        Serial.println(" seconds");
+        return;
+    }
+
+    if (strcmp(command, "sleep") == 0 || strcmp(command, "wake") == 0) {
+        demoEnabled = false;
+        reactions.activity(nowMs);
+        if (strcmp(command, "sleep") == 0) {
+            syncReaction(nowMs); // restore manual baseline before sleeping
+            face.setSleeping(true, nowMs);
+        } else {
+            face.setSleeping(false, nowMs);
+            syncReaction(nowMs);
+        }
+        Serial.println(face.isSleeping() ? "Sleeping" : "Awake");
+        return;
+    }
+
+    if (strcmp(command, "event build-success") == 0 ||
+        strcmp(command, "event build-failure") == 0) {
+        if (face.isSleeping()) {
+            Serial.println("Event ignored while DeskPet is sleeping");
+            return;
+        }
+        demoEnabled = false;
+        const bool success = strcmp(command, "event build-success") == 0;
+        reactions.buildResult(success, nowMs);
+        syncReaction(nowMs);
+        Serial.println(success ? "Build OK -> Excited (4.5s)" :
+                                 "Build failed -> Furious (4.5s)");
+        return;
+    }
+
+    if (strcmp(command, "next") == 0) {
+        demoEnabled = false;
+        reactions.nextEmotion(nowMs);
+        syncReaction(nowMs);
+        Serial.print("Mood: ");
+        Serial.println(emotionName(reactions.manualEmotion()));
+        return;
+    }
+    for (const auto& item : kEmotionCommands) {
+        if (strcmp(command, item.command) == 0) {
+            demoEnabled = false;
+            reactions.chooseEmotion(item.emotion, nowMs);
+            syncReaction(nowMs);
+            Serial.print("Mood: ");
+            Serial.println(emotionName(reactions.manualEmotion()));
+            return;
+        }
+    }
+    if (*command) {
+        Serial.println("Unknown command. Type help.");
     }
 }
 
 void readSerial(uint32_t nowMs) {
-    // Bounded line buffer: never block waiting for the end of a command.
     while (Serial.available() > 0) {
         const char value = static_cast<char>(Serial.read());
         if (value == '\r') continue;
@@ -160,7 +253,7 @@ void setup() {
         Serial.println("Could not allocate face sprite (check PSRAM)");
         return;
     }
-
+    reactions.begin(millis());
     Serial.println("DeskPet 0.1 ready. Type help.");
 }
 
@@ -168,16 +261,30 @@ void loop() {
     const uint32_t now = millis();
     if (userButton.pressed(now)) {
         demoEnabled = false;
-        face.nextEmotion(now);
+        reactions.nextEmotion(now);
+        syncReaction(now);
     }
     if (bootButton.pressed(now)) {
         demoEnabled = false;
-        face.setSleeping(!face.isSleeping(), now);
+        reactions.activity(now);
+        if (face.isSleeping()) {
+            face.setSleeping(false, now);
+            syncReaction(now);
+        } else {
+            syncReaction(now);
+            face.setSleeping(true, now);
+        }
     }
+
     readSerial(now);
     if (demoEnabled && static_cast<int32_t>(now - nextDemoMs) >= 0) {
-        face.nextEmotion(now);
+        reactions.nextEmotion(now);
+        syncReaction(now);
         nextDemoMs = now + kDemoIntervalMs;
+    }
+    if (!demoEnabled && !face.isSleeping()) {
+        reactions.tick(now);
+        syncReaction(now);
     }
     face.update(now);
     delay(1);
