@@ -16,7 +16,7 @@ enum_match = re.search(r"enum class Emotion\s*:\s*uint8_t\s*\{(.*?)\}", header, 
 assert enum_match, "Emotion enum missing"
 emotions = re.findall(r"\b([A-Za-z]+)(?:\s*=\s*0)?\s*,", enum_match.group(1))
 emotions = [name for name in emotions if name != "Count"]
-assert len(emotions) == 17, f"Expected 17 emotions; got {len(emotions)}"
+assert len(emotions) == 21, f"Expected 21 emotions; got {len(emotions)}"
 
 for emotion in emotions:
     assert f"case Emotion::{emotion}: return" in source, f"Name missing: {emotion}"
@@ -52,7 +52,7 @@ assert "bewilderedOffset" in source, "Missing delayed pupil travel"
 assert "4800u" in source, "Missing return cycle of the drifting pupil"
 assert "mouthY + 3 + length" in source, "Missing animated drool drop"
 assert '"bewildered", Emotion::Bewildered' in serial, "Missing Serial command"
-assert "cycling all 17 emotions" in serial, "Wrong demo description"
+assert "cycling all 21 emotions" in serial, "Wrong demo description"
 
 
 reaction = (ROOT / "include/ReactionController.h").read_text(encoding="utf-8")
@@ -219,6 +219,44 @@ assert "static constexpr uint32_t kReactionDurationMs = 4500" in reaction
 assert "void showTemporary(Emotion emotion" in reaction
 assert "reactionDurationMs_" in reaction
 assert (ROOT / "tests/button_gesture_test.cpp").is_file()
+
+# Comic-expression regression: recognisable accessories on tiny IPS.
+for mood in ("Nerd", "Derp", "Gremlin", "Panic"):
+    assert f"case Emotion::{mood}:" in source, f"No face pose for {mood}"
+    assert f"Emotion::{mood}" in serial, f"No command for {mood}"
+    assert f"emotion == Emotion::{mood}" in source, f"No blink transition for {mood}"
+assert "void FaceAnimator::drawComicFeatures(int eyeY, float openness)" in source
+assert "drawComicFeatures(eyeY, openness);" in source
+for visual in ("canvas_.drawRoundRect(x, eyeY",
+               "canvas_.fillRect(mid - 9, eyeY + 30",
+               "canvas_.fillRoundRect(mid + 2 + sway",
+               "canvas_.fillTriangle(mid - 15",
+               "canvas_.fillTriangle(sweatX, sweatY - 4"):
+    assert visual in source, f"Comic feature missing: {visual}"
+
+bond = (ROOT / "include/PetBond.h").read_text(encoding="utf-8")
+assert "class PetBond" in bond
+assert "kInitialScore = 50u" in bond
+assert "kDecayMs = 600000u" in bond
+assert "void pet(uint32_t nowMs)" in bond
+assert "void interact(uint32_t nowMs)" in bond
+assert "bool tick(uint32_t nowMs, bool awake, bool eligible" in bond
+assert "Emotion::Nerd" in bond and "Emotion::Derp" in bond
+assert "Emotion::Gremlin" in bond and "Emotion::Panic" in bond
+assert "PetBond bond;" in serial
+assert "bond.pet(nowMs);" in serial
+assert "bond.surprise(nowMs);" in serial
+assert "bond.build(success, nowMs);" in serial
+assert "bond.tick(now, !face.isSleeping(), allowAmbient" in serial
+assert "reactions.showTemporary(comic, now, PetBond::kComicDurationMs)" in serial
+assert "face.setAffection(bond.score());" in serial
+assert "bond.status" not in serial  # status command is textual: bond status
+for cmd in ("bond on", "bond off", "bond reset", "bond status"):
+    assert f'strcmp(command, "{cmd}")' in serial
+assert (ROOT / "tests/pet_bond_test.cpp").is_file()
+assert "checkMood(reactions, Emotion::Panic);" in (
+    ROOT / "tests/reaction_controller_test.cpp"
+).read_text(encoding="utf-8")
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
