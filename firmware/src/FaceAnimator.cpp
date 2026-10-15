@@ -1,5 +1,6 @@
 #include "FaceAnimator.h"
 #include "ComicFont.h"
+#include "HeartShape.h"
 
 #include <math.h>
 
@@ -8,6 +9,8 @@ constexpr uint16_t kBackground = 0x0862;
 constexpr uint16_t kEye = 0xDFFF;
 constexpr uint16_t kPupil = 0x0882;
 constexpr uint16_t kAccent = 0x5F1F;
+constexpr uint16_t kLoveRed = 0xFA8D;       // coral red #FF5268 (RGB565)
+constexpr uint16_t kLoveHighlight = 0xFE7B; // soft pink shine
 constexpr uint16_t kMuted = 0x94B2;
 constexpr uint32_t kFrameIntervalMs = 33;
 constexpr uint32_t kBlinkDurationMs = 180;
@@ -579,6 +582,26 @@ void FaceAnimator::drawClosedEye(int centerX, int centerY) {
                           62, stroke, stroke / 2, kEye);
 }
 
+void FaceAnimator::drawHeartEye(int centerX, int centerY, float openness) {
+    // Symmetric red heart with round lobes and a proper top notch.
+    // Render scanlines from a tiny lookup table instead of rasterizing
+    // a floating-point implicit curve for every pixel and every frame.
+    const float phase = static_cast<float>(animationNowMs_ - emotionStartedMs_);
+    const float pulse = 1.0f + 0.045f * sinf(phase * 0.00433f);
+    deskpet_heart::draw(centerX, centerY, pulse, openness,
+                        [this](int x, int y, int w, int h) {
+                            canvas_.fillRect(x, y, w, h, kLoveRed);
+                        });
+
+    // Small warm highlight inside the upper-left lobe, only while open.
+    // It scales with the pulse but never leaves the filled silhouette.
+    if (openness > 0.60f) {
+        const int shineX = centerX - static_cast<int>(14.0f * pulse);
+        const int shineY = centerY - static_cast<int>(12.0f * openness);
+        canvas_.fillCircle(shineX, shineY, 3, kLoveHighlight);
+    }
+}
+
 void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft) {
     const EyePose& pose = eyes_[isLeft ? 0 : 1];
     const float ambient = idleEnvelope();
@@ -612,20 +635,7 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     }
 
     if (visualEmotion_ == Emotion::Love) {
-        // Heart eyes pulse while idle and shrink vertically as they blink.
-        const float beat = sinf(static_cast<float>(animationNowMs_ - emotionStartedMs_) *
-                                0.006f);
-        const int radius = static_cast<int>((14.0f + 1.5f * (1.0f + beat)) *
-                                            eyeOpen);
-        const int topY = centerY - static_cast<int>(10.0f * eyeOpen);
-        const int topSpan = static_cast<int>(13.0f * eyeOpen);
-        const int halfBase = static_cast<int>(28.0f * eyeOpen);
-        canvas_.fillCircle(centerX - topSpan, topY, radius, kAccent);
-        canvas_.fillCircle(centerX + topSpan, topY, radius, kAccent);
-        canvas_.fillTriangle(centerX - halfBase, topY - 3,
-                             centerX + halfBase, topY - 3,
-                             centerX, centerY + static_cast<int>(31.0f * eyeOpen),
-                             kAccent);
+        drawHeartEye(centerX, centerY + 1, eyeOpen);
         return;
     }
 
