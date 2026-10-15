@@ -115,5 +115,24 @@ assert "canvas_.fillRect(x, y, w, h, kLoveRed);" in source
 assert "visualEmotion_ == Emotion::Love ? kLoveRed : kAccent" in source
 assert (ROOT / "tests/heart_shape_test.cpp").is_file()
 
+palette = (ROOT / "include/MoodPalette.h").read_text(encoding="utf-8")
+assert "kAngryEye = 0xFE91" in palette, "Angry must use amber #FFD18B"
+assert "kAngryBrow = 0xFCC6" in palette
+assert "kFuriousEye = 0xF9CA" in palette, "Furious must use scarlet #FF3B55"
+assert "kFuriousBrow = 0xF929" in palette
+assert "kFuriousSpark = 0xFEAB" in palette
+assert "inline uint16_t blend565(" in palette
+assert "inline Colors colors(" in palette
+assert "void FaceAnimator::animateMoodColors()" in source
+assert "angerTint_ += (angryTarget - angerTint_) * 0.19f;" in source
+assert "furyTint_ += (furiousTarget - furyTint_) * 0.19f;" in source
+assert "deskpet_mood::colors(angryStrength, furiousStrength, baseBrow)" in source
+assert "canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, eyeFill_);" in source
+assert "canvas_.fillCircle(pupilX, pupilY, pupilRadius, pupilFill_);" in source
+assert "visualEmotion_ == Emotion::Angry" in source
+assert "visualEmotion_ == Emotion::Furious" in source
+assert "kLoveRed = 0xFA8D" in source, "Love colour must remain unchanged"
+assert (ROOT / "tests/mood_palette_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
