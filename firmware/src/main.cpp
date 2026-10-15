@@ -52,14 +52,26 @@ uint32_t nextDemoMs = 0;
 
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Commands: neutral happy curious surprised sleepy angry sad love confused excited playful sleep wake next demo on demo off ping help");
+        Serial.println("Commands: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored sleep wake next demo on demo off sass on sass off quip ping help");
     } else if (strcmp(command, "ping") == 0) {
         Serial.println("pong");
+    } else if (strcmp(command, "sass on") == 0) {
+        face.setSassEnabled(true, nowMs);
+        Serial.println("Sass ON (censored Russian comic quips; RAM-only).");
+        return;
+    } else if (strcmp(command, "sass off") == 0) {
+        face.setSassEnabled(false, nowMs);
+        Serial.println("Sass OFF.");
+        return;
+    } else if (strcmp(command, "quip") == 0) {
+        Serial.println(face.showQuip(nowMs) ? "Comic quip!" :
+            "Comic quips are disabled: type sass on.");
+        return;
     } else if (strcmp(command, "demo on") == 0) {
         demoEnabled = true;
         face.setEmotion(Emotion::Neutral, nowMs);
         nextDemoMs = nowMs + kDemoIntervalMs;
-        Serial.println("Demo ON: cycling all 11 emotions.");
+        Serial.println("Demo ON: cycling all 16 emotions.");
         return;
     } else if (strcmp(command, "demo off") == 0) {
         demoEnabled = false;
@@ -93,6 +105,16 @@ void handleCommand(const char* command, uint32_t nowMs) {
         face.setEmotion(Emotion::Excited, nowMs);
     } else if (strcmp(command, "playful") == 0) {
         face.setEmotion(Emotion::Playful, nowMs);
+    } else if (strcmp(command, "smug") == 0) {
+        face.setEmotion(Emotion::Smug, nowMs);
+    } else if (strcmp(command, "furious") == 0) {
+        face.setEmotion(Emotion::Furious, nowMs);
+    } else if (strcmp(command, "embarrassed") == 0) {
+        face.setEmotion(Emotion::Embarrassed, nowMs);
+    } else if (strcmp(command, "dizzy") == 0) {
+        face.setEmotion(Emotion::Dizzy, nowMs);
+    } else if (strcmp(command, "bored") == 0) {
+        face.setEmotion(Emotion::Bored, nowMs);
     } else if (*command) {
         Serial.println("Unknown command. Type help.");
         return;
