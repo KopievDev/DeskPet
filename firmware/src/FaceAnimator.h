@@ -33,6 +33,7 @@ public:
     bool showQuip(uint32_t nowMs);
     void setPersonality(Personality personality, uint32_t nowMs);
     Personality personality() const { return personality_; }
+    void setAffection(uint8_t score) { affection_ = score; }
 
     // Ambient gestures are visual-only: never replace the user's emotion.
     void setIdleGesture(IdleGesture gesture, uint32_t startedMs);
@@ -51,6 +52,7 @@ private:
     void drawIdleDetails(int eyeY);
     void drawParticles(float openness);
     void drawLifecycleOverlay();
+    void drawComicFeatures(int eyeY, float openness);
     float idleEnvelope() const;
     const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
@@ -109,6 +111,7 @@ private:
     IdleGesture idleGesture_ = IdleGesture::None;
     uint32_t idleStartedMs_ = 0;
     Personality personality_ = Personality::Calm;
+    uint8_t affection_ = 50u;
     bool sassEnabled_ = false;
     bool quipVisible_ = false;
     uint32_t quipStartedMs_ = 0;
