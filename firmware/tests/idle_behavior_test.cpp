@@ -36,8 +36,17 @@ int main() {
     assert(!idle.tick(start + IdleBehavior::duration(gesture) + 1, true));
 
     // Another gesture is scheduled after a full new quiet interval.
-    const uint32_t nextStart = firstGesture(idle, start + 2300);
-    assert(nextStart > start + IdleBehavior::duration(gesture));
+    const uint32_t finishedAt = start + IdleBehavior::duration(gesture);
+    uint32_t nextStart = 0;
+    for (uint32_t delta = 50; delta <= 18100; delta += 50) {
+        if (idle.tick(finishedAt + delta, true)) {
+            nextStart = finishedAt + delta;
+            assert(idle.isActive());
+            assert(delta >= 9000 && delta <= 18100);
+            break;
+        }
+    }
+    assert(nextStart != 0);
     assert(idle.tick(nextStart + 100, false)); // build/demo/sleep interruption
     assert(idle.gesture() == IdleGesture::None);
     assert(!idle.tick(nextStart + 150, false));
