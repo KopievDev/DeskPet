@@ -38,6 +38,7 @@ private:
     void drawEye(int centerX, int centerY, float openness, bool isLeft);
     void drawBrow(int centerX, uint8_t index, uint16_t color);
     void drawClosedEye(int centerX, int centerY);
+    void drawHeartEye(int centerX, int centerY, float openness);
     void animateBrows();
     void animateEyes();
     void updateTransition(uint32_t nowMs);
