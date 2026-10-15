@@ -21,6 +21,7 @@ struct Frame {
     int8_t grinLift = 0;
     int8_t jawShake = 0;
     int8_t sweatDrop = 0;
+    uint8_t sweatAlpha = 0;
     uint8_t glint = 0;
 };
 
@@ -94,8 +95,15 @@ inline Frame at(Emotion mood, uint32_t elapsedMs) {
             frame.leftPupil = odd ? -3 : 3;
             frame.rightPupil = odd ? 4 : -4;
             frame.jawShake = odd ? -2 : 2;
-            frame.sweatDrop = static_cast<int8_t>(
-                (t % 1950u) * 11u / 1950u);
+            // Exactly three drops per 4.8s scene. Hide each droplet at
+            // the respawn point to avoid a visible vertical teleport.
+            const uint32_t drip = t % 1600u;
+            frame.sweatDrop = static_cast<int8_t>(drip * 11u / 1600u);
+            uint32_t fade = 255u;
+            if (drip < 180u) fade = drip * 255u / 180u;
+            else if (drip > 1320u)
+                fade = (1600u - drip) * 255u / 280u;
+            frame.sweatAlpha = static_cast<uint8_t>(fade);
             break;
         }
         default: break;
