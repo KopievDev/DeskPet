@@ -7,11 +7,11 @@
 static uint32_t firstGesture(IdleBehavior& idle, uint32_t now) {
     // The first event must occur after a quiet delay, never immediately.
     assert(!idle.tick(now, true));
-    for (uint32_t ms = 1; ms <= 19000; ms += 50) {
+    for (uint32_t ms = 1; ms <= 27000; ms += 50) {
         if (idle.tick(now + ms, true)) {
             assert(idle.isActive());
             assert(idle.gesture() != IdleGesture::None);
-            assert(ms >= 9000 && ms <= 18050);
+            assert(ms >= 14000 && ms <= 26050);
             return now + ms;
         }
     }
@@ -38,11 +38,11 @@ int main() {
     // Another gesture is scheduled after a full new quiet interval.
     const uint32_t finishedAt = start + IdleBehavior::duration(gesture);
     uint32_t nextStart = 0;
-    for (uint32_t delta = 50; delta <= 18100; delta += 50) {
+    for (uint32_t delta = 50; delta <= 26100; delta += 50) {
         if (idle.tick(finishedAt + delta, true)) {
             nextStart = finishedAt + delta;
             assert(idle.isActive());
-            assert(delta >= 9000 && delta <= 18100);
+            assert(delta >= 14000 && delta <= 26100);
             break;
         }
     }
@@ -70,7 +70,7 @@ int main() {
     coverage.tick(time, true);
     for (int i = 0; i < 120; ++i) {
         bool began = false;
-        for (uint32_t ms = 100; ms <= 20000; ms += 100) {
+        for (uint32_t ms = 100; ms <= 27000; ms += 100) {
             if (coverage.tick(time + ms, true) && coverage.isActive()) {
                 time += ms;
                 seen[static_cast<uint8_t>(coverage.gesture())] = true;
