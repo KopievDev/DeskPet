@@ -59,5 +59,25 @@ assert 'strcmp(command, "event build-failure")' in serial
 for control in ("idle on", "idle off", "status"):
     assert f'strcmp(command, "{control}")' in serial, f"Missing control: {control}"
 
+ambient = (ROOT / "include/IdleBehavior.h").read_text(encoding="utf-8")
+face_cpp = source
+assert "enum class IdleGesture" in ambient
+for gesture in ("LookLeft", "LookRight", "Squint", "Yawn",
+                "Startled", "BrowBounce", "Wink"):
+    assert gesture in ambient, f"Missing ambient gesture: {gesture}"
+assert "9000u + random32() % 9001u" in ambient
+assert "bool tick(uint32_t nowMs, bool eligible)" in ambient
+assert "idleGesture_ = gesture;" in face_cpp
+assert "float FaceAnimator::idleEnvelope() const" in face_cpp
+assert "void FaceAnimator::drawIdleDetails(int eyeY)" in face_cpp
+assert "ambient.tick(now, allowAmbient)" in serial
+assert "reactions.manualEmotion() == Emotion::Neutral" in serial
+assert "reactions.reactionActive()" in serial
+assert "reactions.idleActive()" in serial
+for command in ("ambient on", "ambient off"):
+    assert f'strcmp(command, "{command}")' in serial, f"Missing: {command}"
+assert "cancelAmbient(now);" in serial
+assert (ROOT / "tests/idle_behavior_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian quips, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
