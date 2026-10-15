@@ -145,6 +145,7 @@ FaceAnimator::EyePose FaceAnimator::targetEyePose(Emotion emotion, bool isLeft) 
             break;
         case Emotion::Sleepy:
             pose.openness = 0.38f;
+            pose.pupilRadius = 0.0f; // pupils fade by shrinking, not disappearing
             if (isLeft) pose.lidLeft = 9.0f;
             else pose.lidRight = 9.0f;
             break;
@@ -426,7 +427,6 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     // Width, height, opening, pupil size and each sloping eyelid morph
     // continuously, including interruptions by rapid new commands.
     const bool surprised = visualEmotion_ == Emotion::Surprised;
-    const bool sleepy = visualEmotion_ == Emotion::Sleepy;
     const bool confused = visualEmotion_ == Emotion::Confused;
     const bool excited = visualEmotion_ == Emotion::Excited;
     const bool curious = visualEmotion_ == Emotion::Curious;
@@ -445,8 +445,13 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
 
     canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, kEye);
 
-    if (!sleepy && visibleH >= 24) {
-        const int pupilRadius = static_cast<int>(pose.pupilRadius + 0.5f);
+    // Shrink pupils as Sleepy closes its eyelids; clip their radius
+    // to the available eye height to prevent dark circles spilling out.
+    const int requestedRadius = static_cast<int>(pose.pupilRadius + 0.5f);
+    const int availableRadius = visibleH / 2 - 3;
+    const int pupilRadius = requestedRadius < availableRadius
+                                ? requestedRadius : availableRadius;
+    if (visibleH >= 20 && pupilRadius >= 3) {
         // Large surprised pupils cannot cross the white boundary.
         const int lookOffset = confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
@@ -454,7 +459,9 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         const int pupilX = centerX + lookOffset;
         const int pupilY = centerY + bounce + ((curious || sad) ? -2 : 3);
         canvas_.fillCircle(pupilX, pupilY, pupilRadius, kPupil);
-        canvas_.fillCircle(pupilX - 5, pupilY - 6, surprised ? 6 : 4, kEye);
+        if (pupilRadius >= 8) {
+            canvas_.fillCircle(pupilX - 5, pupilY - 6, surprised ? 6 : 4, kEye);
+        }
         if (excited) {
             canvas_.fillCircle(pupilX + 7, pupilY + 8, 2, kEye);
         }
