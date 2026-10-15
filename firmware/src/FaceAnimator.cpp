@@ -3,6 +3,7 @@
 #include "HeartShape.h"
 #include "MoodPalette.h"
 #include "FuryGlow.h"
+#include "EmotionParticles.h"
 
 #include <math.h>
 
@@ -861,6 +862,75 @@ void FaceAnimator::drawQuip() {
     deskpet_comic::draw(canvas_, boxX + 9, boxY + 5, phrase, kEye);
 }
 
+void FaceAnimator::drawParticles(float openness) {
+    if (sleeping_ || openness <= 0.12f) return;
+    const deskpet_particles::Style style =
+        deskpet_particles::styleFor(visualEmotion_);
+    if (style == deskpet_particles::Style::None) return;
+
+    // Six tiny particles across both outer gutters, with deterministic
+    // lifetime/positions and no allocation, sprite or alpha framebuffer.
+    // Multiply their fade by eye openness to hide them during blinking
+    // and smoothly restore them as the eyes reopen.
+    const uint32_t elapsed = animationNowMs_ - emotionStartedMs_;
+    static const uint8_t kHeartPixels[6] = {
+        0x66, // .##..##.
+        0xFF, // ########
+        0xFF, // ########
+        0x7E, // .######.
+        0x3C, // ..####..
+        0x18  // ...##...
+    };
+
+    for (uint8_t index = 0; index < deskpet_particles::kParticleCount; ++index) {
+        const auto particle = deskpet_particles::sample(style, elapsed, index);
+        const uint8_t opacity = static_cast<uint8_t>(
+            static_cast<float>(particle.opacity) * openness);
+        if (opacity < 18u) continue;
+
+        uint16_t baseColor = deskpet_mood::kFuriousSpark;
+        if (style == deskpet_particles::Style::Hearts) baseColor = kLoveRed;
+        else if (style == deskpet_particles::Style::Steam) baseColor = 0xCEBC;
+        const uint16_t color =
+            deskpet_mood::blend565(kBackground, baseColor, opacity);
+
+        const int x = particle.x;
+        const int y = particle.y;
+        if (style == deskpet_particles::Style::Sparks) {
+            const int extent = particle.size + 1;
+            canvas_.drawLine(x - extent, y, x + extent, y, color);
+            canvas_.drawLine(x, y - extent, x, y + extent, color);
+            if (index % 2u == 0u && opacity > 120u) {
+                canvas_.drawPixel(x - 2, y - 2, color);
+                canvas_.drawPixel(x + 2, y + 2, color);
+            }
+        } else if (style == deskpet_particles::Style::Hearts) {
+            // Hand-drawn tiny pixel heart. Rounded lobes and a pointed
+            // tip read more clearly than a triangle at 8x6 pixels.
+            for (uint8_t row = 0; row < 6u; ++row) {
+                const uint8_t bits = kHeartPixels[row];
+                for (uint8_t col = 0; col < 8u; ++col) {
+                    if (bits & (0x80u >> col)) {
+                        canvas_.drawPixel(x - 4 + col, y - 3 + row, color);
+                    }
+                }
+            }
+            if (index % 2u == 0u && opacity > 160u) {
+                canvas_.drawPixel(x - 2, y - 1, kLoveHighlight);
+            }
+        } else {
+            // Steam: a slender wandering S-shaped wisp, never a solid
+            // smoke cloud. Its cool tint contrasts with scarlet Furious.
+            canvas_.drawLine(x - 2, y + 3, x + 1, y + 1, color);
+            canvas_.drawLine(x + 1, y + 1, x - 1, y - 2, color);
+            canvas_.drawLine(x - 1, y - 2, x + 2, y - 5, color);
+            if (particle.size == 3u) {
+                canvas_.drawPixel(x + 2, y - 6, color);
+            }
+        }
+    }
+}
+
 void FaceAnimator::drawIdleDetails(int eyeY) {
     const float ambient = idleEnvelope();
     if (ambient <= 0.05f) return;
@@ -908,6 +978,7 @@ void FaceAnimator::render(float openness) {
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
     drawIdleDetails(eyeY);
+    drawParticles(openness);
 
     // Decorations enter only with the visible shape, not at the start of
     // a topology-changing blink.
