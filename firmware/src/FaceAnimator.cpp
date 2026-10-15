@@ -936,6 +936,15 @@ void FaceAnimator::render(float openness) {
     canvas_.setTextSize(1);
     canvas_.setCursor(26, 9);
     canvas_.print("DeskPet");
+
+    // Small always-visible profile label (outside the comic bubble).
+    canvas_.setCursor(width_ - 51, 9);
+    switch (personality_) {
+        case Personality::Calm: canvas_.print("CALM"); break;
+        case Personality::Playful: canvas_.print("PLAY"); break;
+        case Personality::Cheeky: canvas_.print("CHEEKY"); break;
+    }
+
     canvas_.setCursor(10, height_ - 17);
     canvas_.print(sleeping_ ? "SLEEPING" : emotionName(emotion_));
     canvas_.setCursor(width_ - 80, height_ - 17);
