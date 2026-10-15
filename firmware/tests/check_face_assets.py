@@ -134,5 +134,20 @@ assert "visualEmotion_ == Emotion::Furious" in source
 assert "kLoveRed = 0xFA8D" in source, "Love colour must remain unchanged"
 assert (ROOT / "tests/mood_palette_test.cpp").is_file()
 
+glow = (ROOT / "include/FuryGlow.h").read_text(encoding="utf-8")
+assert "constexpr uint32_t kPulsePeriodMs = 1200u;" in glow
+assert "constexpr uint32_t kIntroFlashMs = 320u;" in glow
+assert "inline Halo alpha(uint32_t elapsedMs, uint8_t strength)" in glow
+assert "template <typename Stroke>" in glow
+assert "const int offsets[] = {13, 9, 5};" in glow
+assert "deskpet_mood::blend565(" in glow
+assert '#include "FuryGlow.h"' in source
+assert "if (furious && !sleeping_ && eyeOpen > 0.30f)" in source
+assert "deskpet_fury_glow::draw(" in source
+assert "canvas_.drawRoundRect(x, y, w, h, r, color);" in source
+assert "animationNowMs_ - emotionStartedMs_, strength, kBackground" in source
+assert "kLoveRed = 0xFA8D" in source
+assert (ROOT / "tests/fury_glow_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
