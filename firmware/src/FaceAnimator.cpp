@@ -2,6 +2,7 @@
 #include "ComicFont.h"
 #include "HeartShape.h"
 #include "MoodPalette.h"
+#include "FuryGlow.h"
 
 #include <math.h>
 
@@ -696,6 +697,22 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const int left = centerX - eyeW / 2;
     const int top = centerY - visibleH / 2 + bounce;
     const int radius = visibleH / 2 < eyeW / 2 ? visibleH / 2 : eyeW / 2;
+
+    // Three thin, pre-blended crimson rings create a glowing aura without
+    // alpha compositing. Draw them behind the eye and only for Furious;
+    // strength follows the existing eye tint and vanishes during a blink.
+    // The intro flare emphasizes the transition to Furious, then a soft
+    // 1.2-second pulse continues while the emotion is active.
+    if (furious && !sleeping_ && eyeOpen > 0.30f) {
+        const uint8_t strength = static_cast<uint8_t>(
+            clampFloat(furyTint_ * eyeOpen, 0.0f, 1.0f) * 255.0f);
+        deskpet_fury_glow::draw(
+            left, top, eyeW, visibleH, radius,
+            animationNowMs_ - emotionStartedMs_, strength, kBackground,
+            [this](int x, int y, int w, int h, int r, uint16_t color) {
+                canvas_.drawRoundRect(x, y, w, h, r, color);
+            });
+    }
 
     canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, eyeFill_);
 
