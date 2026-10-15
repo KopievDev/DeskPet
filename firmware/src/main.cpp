@@ -10,6 +10,7 @@
 #include "PetBond.h"
 #include "BuildComedy.h"
 #include "UserActivity.h"
+#include "PetNeeds.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -24,6 +25,7 @@ ReactionController reactions;
 PetBond bond;
 deskpet_build_comedy::Story buildStory;
 deskpet_activity::Controller userActivity;
+deskpet_needs::Controller needs;
 IdleBehavior ambient;
 
 struct NamedEmotion {
@@ -77,6 +79,7 @@ void syncReaction(uint32_t nowMs) {
     Emotion next;
     if (reactions.takeChange(next)) {
         cancelAmbient(nowMs);
+        face.setNeedPrompt(deskpet_needs::Kind::None);
         face.setEmotion(next, nowMs);
     }
 }
@@ -85,9 +88,18 @@ void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
     cancelAmbient(nowMs);
     demoEnabled = false;
-    if (action == deskpet_button::Action::Hold) bond.pet(nowMs);
-    else if (action == deskpet_button::Action::DoubleTap) bond.surprise(nowMs);
-    else bond.interact(nowMs);
+    face.setNeedPrompt(deskpet_needs::Kind::None);
+    if (action == deskpet_button::Action::Hold) {
+        bond.pet(nowMs);
+        needs.pet();
+    } else if (action == deskpet_button::Action::DoubleTap) {
+        bond.surprise(nowMs);
+        needs.surprise();
+    } else {
+        bond.interact(nowMs);
+        needs.interact();
+    }
+    // A user action is the strongest interaction, ahead of idle cues.
 
     if (action == deskpet_button::Action::Tap) {
         reactions.nextEmotion(nowMs);
@@ -110,9 +122,11 @@ void handleBootGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
     cancelAmbient(nowMs);
     demoEnabled = false;
+    face.setNeedPrompt(deskpet_needs::Kind::None);
     reactions.activity(nowMs);
     if (action == deskpet_button::Action::Hold || face.isSleeping()) {
         bond.interact(nowMs);
+        needs.interact();
     }
 
     if (action == deskpet_button::Action::Tap) {
@@ -158,6 +172,13 @@ void showStatus() {
     Serial.print(" | computer: ");
     Serial.print(deskpet_activity::presenceName(userActivity.presence()));
     Serial.print(userActivity.enabled() ? "" : " (off)");
+    Serial.print(" | needs: E");
+    Serial.print(needs.energy());
+    Serial.print(" M");
+    Serial.print(needs.mood());
+    Serial.print(" T");
+    Serial.print(needs.attention());
+    Serial.print(needs.enabled() ? "" : " (off)");
     Serial.print(" | build failures: ");
     Serial.print(buildStory.consecutiveFailures());
     Serial.print(" | sass: ");
@@ -186,6 +207,8 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Bond: bond on | bond off | bond reset | bond status (RAM only)");
         Serial.println("Build comedy: build status | build reset | event build-success/failure");
         Serial.println("Mac activity: event user-idle | event user-active | activity on/off/status");
+        Serial.println("Needs: needs status/reset/on/off | needs coffee/play | needs set E M T");
+        Serial.println("Needs debug: needs show coffee/attention/cheer");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -270,6 +293,75 @@ void handleCommand(const char* command, uint32_t nowMs) {
         }
         Serial.print("Computer: ");
         Serial.println(deskpet_activity::presenceName(userActivity.presence()));
+        return;
+    }
+    if (strcmp(command, "needs status") == 0) {
+        Serial.print("Energy: ");
+        Serial.print(needs.energy());
+        Serial.print(" | mood: ");
+        Serial.print(needs.mood());
+        Serial.print(" | attention: ");
+        Serial.print(needs.attention());
+        Serial.print(" | needs: ");
+        Serial.println(needs.enabled() ? "ON" : "OFF");
+        return;
+    }
+    if (strcmp(command, "needs reset") == 0) {
+        needs.reset(nowMs);
+        face.setNeedPrompt(deskpet_needs::Kind::None);
+        Serial.println("Needs reset: E78 M70 T65");
+        return;
+    }
+    if (strcmp(command, "needs on") == 0 ||
+        strcmp(command, "needs off") == 0) {
+        const bool enabled = strcmp(command, "needs on") == 0;
+        needs.setEnabled(enabled, nowMs);
+        face.setNeedPrompt(deskpet_needs::Kind::None);
+        Serial.println(enabled ? "Needs ON" : "Needs OFF");
+        return;
+    }
+    if (strncmp(command, "needs set ", 10) == 0) {
+        unsigned int energy, mood, attention;
+        char trailing;
+        if (sscanf(command + 10, "%u %u %u %c",
+                   &energy, &mood, &attention, &trailing) != 3 ||
+            energy > 100u || mood > 100u || attention > 100u) {
+            Serial.println("Use: needs set <0..100> <0..100> <0..100>");
+            return;
+        }
+        needs.set(static_cast<uint8_t>(energy), static_cast<uint8_t>(mood),
+                  static_cast<uint8_t>(attention), nowMs);
+        Serial.println("Needs updated");
+        return;
+    }
+    if (strcmp(command, "needs coffee") == 0 ||
+        strcmp(command, "needs play") == 0 ||
+        strncmp(command, "needs show ", 11) == 0) {
+        const bool coffee = strcmp(command, "needs coffee") == 0;
+        const bool play = strcmp(command, "needs play") == 0;
+        const char* preview = command + 11;
+        deskpet_needs::Cue cue = {Emotion::Neutral,
+                                  deskpet_needs::Kind::None, 4800u};
+        if (coffee || (strcmp(preview, "coffee") == 0 && !play)) {
+            cue = {Emotion::Nerd, deskpet_needs::Kind::Coffee, 4800u};
+        } else if (play || strcmp(preview, "attention") == 0) {
+            cue = {Emotion::Derp, deskpet_needs::Kind::Attention, 4800u};
+        } else if (strcmp(preview, "cheer") == 0) {
+            cue = {Emotion::Excited, deskpet_needs::Kind::Cheer, 4800u};
+        } else {
+            Serial.println("Use: needs show coffee | attention | cheer");
+            return;
+        }
+        if (coffee) needs.coffee();
+        else if (play) needs.play();
+        if (face.isSleeping()) face.setSleeping(false, nowMs);
+        cancelAmbient(nowMs);
+        demoEnabled = false;
+        reactions.showTemporary(cue.emotion, nowMs, cue.durationMs);
+        syncReaction(nowMs);
+        face.setNeedPrompt(cue.kind);
+        Serial.print("Needs: ");
+        Serial.println(coffee ? "coffee served" : play ? "played" : "preview");
         return;
     }
     if (strcmp(command, "build status") == 0) {
@@ -395,6 +487,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         demoEnabled = false;
         const bool success = strcmp(command, "event build-success") == 0;
         bond.build(success, nowMs);
+        needs.build(success);
         const deskpet_build_comedy::Cue cue =
             buildStory.record(success, nowMs);
         // Keep the manually chosen baseline. A button press or a direct
@@ -480,8 +573,10 @@ void setup() {
     reactions.begin(startedAt);
     buildStory.begin();
     userActivity.begin(startedAt);
+    needs.begin(startedAt);
     bond.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0x682C95B3u);
     face.setAffection(bond.score());
+    face.setNeeds(needs.energy(), needs.mood(), needs.attention());
     ambient.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0xB16B00B5u);
     Serial.println("DeskPet 0.1 ready. Type help.");
 }
@@ -494,6 +589,7 @@ void loop() {
         bootButton.poll(digitalRead(kBootButtonPin) == LOW, now), now);
 
     readSerial(now);
+    needs.advance(now, face.isSleeping());
     if (demoEnabled && static_cast<int32_t>(now - nextDemoMs) >= 0) {
         reactions.nextEmotion(now);
         syncReaction(now);
@@ -521,10 +617,24 @@ void loop() {
         syncReaction(now);
     }
 
-    Emotion comic = Emotion::Neutral;
-    const bool allowBond = allowAmbient &&
+    // Needs are strictly lower priority than host presence and builds.
+    // Never interrupt a manual mood, sleep, demo, or a running skit.
+    deskpet_needs::Cue needsCue = {
+        Emotion::Neutral, deskpet_needs::Kind::None, 0u
+    };
+    const bool allowNeeds = allowAmbient &&
         !reactions.reactionActive() &&
         userActivity.presence() != deskpet_activity::Presence::Away;
+    if (needs.tick(now, allowNeeds, ambient.personality(), needsCue)) {
+        cancelAmbient(now);
+        reactions.showTemporary(needsCue.emotion, now, needsCue.durationMs);
+        syncReaction(now);
+        face.setNeedPrompt(needsCue.kind);
+    }
+
+    Emotion comic = Emotion::Neutral;
+    const bool allowBond = allowNeeds &&
+        !reactions.reactionActive();
     if (bond.tick(now, !face.isSleeping(), allowBond,
                   ambient.personality(), comic)) {
         cancelAmbient(now);
@@ -532,6 +642,10 @@ void loop() {
         syncReaction(now);
     }
     face.setAffection(bond.score());
+    face.setNeeds(needs.energy(), needs.mood(), needs.attention());
+    if (!reactions.reactionActive()) {
+        face.setNeedPrompt(deskpet_needs::Kind::None);
+    }
     if (ambient.tick(now, allowAmbient && !reactions.reactionActive() &&
                      userActivity.presence() !=
                          deskpet_activity::Presence::Away)) {
