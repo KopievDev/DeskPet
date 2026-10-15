@@ -110,6 +110,8 @@ void showStatus() {
     Serial.print(demoEnabled ? "on" : "off");
     Serial.print(" | sass: ");
     Serial.print(face.sassEnabled() ? "on" : "off");
+    Serial.print(" | personality: ");
+    Serial.print(personalityName(ambient.personality()));
     Serial.print(" | ambient: ");
     Serial.print(ambient.enabled() ? "on" : "off");
     Serial.print(" | gesture: ");
@@ -122,6 +124,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
+        Serial.println("Personality: personality calm | personality playful | personality cheeky");
         Serial.println("Reactions: event build-success | event build-failure | idle on | idle off | idle <15..3600 seconds> | status");
         return;
     }
@@ -141,6 +144,26 @@ void handleCommand(const char* command, uint32_t nowMs) {
                                             "Ambient gestures OFF");
         return;
     }
+    if (strncmp(command, "personality ", 12) == 0) {
+        const char* name = command + 12;
+        Personality next = Personality::Calm;
+        if (strcmp(name, "calm") == 0) next = Personality::Calm;
+        else if (strcmp(name, "playful") == 0) next = Personality::Playful;
+        else if (strcmp(name, "cheeky") == 0) next = Personality::Cheeky;
+        else {
+            Serial.println("Choose: personality calm | personality playful | personality cheeky");
+            return;
+        }
+        cancelAmbient(nowMs);
+        reactions.activity(nowMs);
+        syncReaction(nowMs);
+        ambient.setPersonality(next, nowMs);
+        face.setPersonality(next, nowMs);
+        Serial.print("Personality: ");
+        Serial.println(personalityName(next));
+        return;
+    }
+
     if (strcmp(command, "sass on") == 0 || strcmp(command, "sass off") == 0) {
         cancelAmbient(nowMs);
         reactions.activity(nowMs);
