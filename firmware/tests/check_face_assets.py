@@ -282,5 +282,26 @@ assert 'strcmp(command, "comic next")' in serial
 assert 'Serial.println("Comic: ");' not in serial  # use print, not println
 assert (ROOT / "tests/comic_skits_test.cpp").is_file()
 
+build_story = (ROOT / "include/BuildComedy.h").read_text(encoding="utf-8")
+assert "class Story" in build_story
+assert "kStreakWindowMs = 600000u" in build_story
+assert "kComicDurationMs = 4800u" in build_story
+assert "Cue record(bool success, uint32_t nowMs)" in build_story
+for mood in ("Panic", "Gremlin", "Furious", "Nerd", "Excited"):
+    assert f"Emotion::{mood}" in build_story
+assert "if (failures_ < 99u) ++failures_;" in build_story
+assert "static_cast<uint32_t>(nowMs - lastFailureMs_)" in build_story
+assert '#include "BuildComedy.h"' in serial
+assert "deskpet_build_comedy::Story buildStory;" in serial
+assert "buildStory.begin();" in serial
+assert "buildStory.record(success, nowMs)" in serial
+assert "reactions.showTemporary(cue.emotion, nowMs, cue.durationMs)" in serial
+assert "bond.build(success, nowMs);" in serial
+assert "if (face.isSleeping()) {" in serial  # sleeping builds remain ignored
+assert 'strcmp(command, "build status")' in serial
+assert 'strcmp(command, "build reset")' in serial
+assert 'Serial.print(buildStory.consecutiveFailures());' in serial
+assert (ROOT / "tests/build_comedy_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
