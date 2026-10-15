@@ -37,6 +37,7 @@ public:
         moodCarryMs_ = 0u;
         nextCueMs_ = nowMs + kCueIntervalMs;
         wasEligible_ = false;
+        lastSleeping_ = false;
     }
 
     uint8_t energy() const { return energy_; }
@@ -51,6 +52,7 @@ public:
         attentionCarryMs_ = 0u;
         moodCarryMs_ = 0u;
         wasEligible_ = false;
+        lastSleeping_ = false;
         nextCueMs_ = nowMs + kCueIntervalMs;
     }
 
@@ -112,6 +114,12 @@ public:
     void advance(uint32_t nowMs, bool sleeping) {
         const uint32_t delta = nowMs - lastUpdateMs_;
         lastUpdateMs_ = nowMs;
+        if (sleeping != lastSleeping_) {
+            energyCarryMs_ = 0u;
+            attentionCarryMs_ = 0u;
+            moodCarryMs_ = 0u;
+            lastSleeping_ = sleeping;
+        }
         if (!enabled_) return;
 
         // Reject intervals larger than 12 hours: likely a reset,
@@ -201,6 +209,7 @@ private:
     uint8_t attention_ = 65u;
     bool enabled_ = true;
     bool wasEligible_ = false;
+    bool lastSleeping_ = false;
 };
 
 } // namespace deskpet_needs
