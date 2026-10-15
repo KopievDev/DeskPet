@@ -117,7 +117,9 @@ void showStatus() {
     Serial.print(" | gesture: ");
     Serial.print(static_cast<int>(ambient.gesture()));
     Serial.print(" | sleeping: ");
-    Serial.println(face.isSleeping() ? "yes" : "no");
+    Serial.print(face.isSleeping() ? "yes" : "no");
+    Serial.print(" | animation: ");
+    Serial.println(face.lifecycleName());
 }
 
 void handleCommand(const char* command, uint32_t nowMs) {
