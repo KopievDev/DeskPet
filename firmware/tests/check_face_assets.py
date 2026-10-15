@@ -16,7 +16,7 @@ enum_match = re.search(r"enum class Emotion\s*:\s*uint8_t\s*\{(.*?)\}", header, 
 assert enum_match, "Emotion enum missing"
 emotions = re.findall(r"\b([A-Za-z]+)(?:\s*=\s*0)?\s*,", enum_match.group(1))
 emotions = [name for name in emotions if name != "Count"]
-assert len(emotions) == 16, f"Expected 16 emotions; got {len(emotions)}"
+assert len(emotions) == 17, f"Expected 17 emotions; got {len(emotions)}"
 
 for emotion in emotions:
     assert f"case Emotion::{emotion}: return" in source, f"Name missing: {emotion}"
@@ -40,6 +40,14 @@ for command in ("sass on", "sass off", "quip", "demo on", "demo off"):
     assert f'strcmp(command, "{command}")' in serial, f"Missing: {command}"
 assert "const bool diagonal" in source, "Dizzy pupils must visibly animate"
 assert "kSpecialTransitionMs" in source, "Missing blink transitions"
+assert "case Emotion::Bewildered:" in source
+assert "visualEmotion_ == Emotion::Bewildered" in source
+assert "bewilderedOffset" in source, "Missing delayed pupil travel"
+assert "4800u" in source, "Missing return cycle of the drifting pupil"
+assert "mouthY + 3 + length" in source, "Missing animated drool drop"
+assert '"bewildered", Emotion::Bewildered' in serial, "Missing Serial command"
+assert "cycling all 17 emotions" in serial, "Wrong demo description"
+
 
 reaction = (ROOT / "include/ReactionController.h").read_text(encoding="utf-8")
 assert "kReactionDurationMs = 4500" in reaction
