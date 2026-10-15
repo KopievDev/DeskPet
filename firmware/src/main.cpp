@@ -142,6 +142,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "sass on") == 0 || strcmp(command, "sass off") == 0) {
+        cancelAmbient(nowMs);
         reactions.activity(nowMs);
         syncReaction(nowMs);
         const bool enabled = strcmp(command, "sass on") == 0;
@@ -150,6 +151,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "quip") == 0) {
+        cancelAmbient(nowMs);
         Serial.println(face.showQuip(nowMs) ? "Comic quip!" : "Enable it with sass on");
         return;
     }
@@ -174,6 +176,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "idle on") == 0 || strcmp(command, "idle off") == 0) {
+        cancelAmbient(nowMs);
         reactions.setIdleEnabled(strcmp(command, "idle on") == 0, nowMs);
         syncReaction(nowMs);
         Serial.println(reactions.idleEnabled() ? "Idle reactions ON" : "Idle reactions OFF");
@@ -188,6 +191,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
             Serial.println("Idle timeout must be 15..3600 seconds");
             return;
         }
+        cancelAmbient(nowMs);
         reactions.setIdleSeconds(static_cast<uint32_t>(seconds), nowMs);
         syncReaction(nowMs);
         Serial.print("Idle timeout set to ");
