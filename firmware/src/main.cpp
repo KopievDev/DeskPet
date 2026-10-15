@@ -49,7 +49,7 @@ size_t commandLength = 0;
 
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Commands: neutral happy curious surprised sleepy sleep wake next ping help");
+        Serial.println("Commands: neutral happy curious surprised sleepy angry sad love confused excited playful sleep wake next ping help");
     } else if (strcmp(command, "ping") == 0) {
         Serial.println("pong");
     } else if (strcmp(command, "sleep") == 0) {
@@ -68,6 +68,18 @@ void handleCommand(const char* command, uint32_t nowMs) {
         face.setEmotion(Emotion::Surprised, nowMs);
     } else if (strcmp(command, "sleepy") == 0) {
         face.setEmotion(Emotion::Sleepy, nowMs);
+    } else if (strcmp(command, "angry") == 0) {
+        face.setEmotion(Emotion::Angry, nowMs);
+    } else if (strcmp(command, "sad") == 0) {
+        face.setEmotion(Emotion::Sad, nowMs);
+    } else if (strcmp(command, "love") == 0) {
+        face.setEmotion(Emotion::Love, nowMs);
+    } else if (strcmp(command, "confused") == 0) {
+        face.setEmotion(Emotion::Confused, nowMs);
+    } else if (strcmp(command, "excited") == 0) {
+        face.setEmotion(Emotion::Excited, nowMs);
+    } else if (strcmp(command, "playful") == 0) {
+        face.setEmotion(Emotion::Playful, nowMs);
     } else if (*command) {
         Serial.println("Unknown command. Type help.");
         return;
