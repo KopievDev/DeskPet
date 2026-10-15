@@ -16,6 +16,8 @@ int main() {
     Timeline motion;
     motion.begin(1000u);
     assert(motion.phase() == Phase::Booting);
+    assert(deskpet_lifecycle::phaseName(Phase::Booting)[0] == 'B');
+    assert(deskpet_lifecycle::phaseName(Phase::Waking)[0] == 'W');
     assert(!motion.sleeping());
     assert(closeTo(motion.openness(1000u), 0.055f));
     assert(closeTo(motion.openness(1230u), 0.055f));
