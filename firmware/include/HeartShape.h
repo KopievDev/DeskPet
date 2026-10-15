@@ -4,9 +4,9 @@
 
 namespace deskpet_heart {
 
-// Centered, symmetric 64-column heart silhouette, sampled from the classic
-// parametric heart curve (x = 16 sin^3(t),
-// y = 13 cos(t) - 5 cos(2t) - 2 cos(3t) - cos(4t)).
+// Centered, symmetric 64-column heart silhouette, hand-tuned to resemble
+// the classic mathematical heart curve: round lobes, a genuine notch,
+// smoothly narrowing sides and one pointed tip.
 // One row stores the leftmost pixel and, for the top ten rows,
 // the innermost left-lobe pixel. The right side is mirrored at draw time.
 // This compact lookup avoids filling hundreds of pixels with float
