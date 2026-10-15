@@ -62,8 +62,9 @@ int main() {
     assert(!full.at(64, topY));
 
     // The center fills below the notch and narrows to a pointed tip.
-    assert(full.at(63, topY + 10));
-    assert(full.at(64, topY + 10));
+    // The two lobes merge 12 screen pixels below the first scanline.
+    assert(full.at(63, topY + 12));
+    assert(full.at(64, topY + 12));
     const int tipY = 64 + deskpet_heart::roundToInt(
         (static_cast<int>(deskpet_heart::kFirstRow) +
          static_cast<int>(deskpet_heart::kRowCount) - 1 - 32) * 1.12f);
