@@ -8,6 +8,7 @@
 #include "IdleBehavior.h"
 #include "ButtonGesture.h"
 #include "PetBond.h"
+#include "BuildComedy.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -20,6 +21,7 @@ DeskPetTDisplayS3 display;
 FaceAnimator face(display);
 ReactionController reactions;
 PetBond bond;
+deskpet_build_comedy::Story buildStory;
 IdleBehavior ambient;
 
 struct NamedEmotion {
@@ -151,6 +153,8 @@ void showStatus() {
     Serial.print("/100 (");
     Serial.print(bond.enabled() ? "on" : "off");
     Serial.print(")");
+    Serial.print(" | build failures: ");
+    Serial.print(buildStory.consecutiveFailures());
     Serial.print(" | sass: ");
     Serial.print(face.sassEnabled() ? "on" : "off");
     Serial.print(" | personality: ");
@@ -175,6 +179,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Personality: personality calm | personality playful | personality cheeky");
         Serial.println("Reactions: event build-success | event build-failure | idle on/off | idle <15..3600> | status");
         Serial.println("Bond: bond on | bond off | bond reset | bond status (RAM only)");
+        Serial.println("Build comedy: build status | build reset | event build-success/failure");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -225,6 +230,16 @@ void handleCommand(const char* command, uint32_t nowMs) {
         bond.reset(nowMs);
         face.setAffection(bond.score());
         Serial.println("Affection reset to 50/100");
+        return;
+    }
+    if (strcmp(command, "build status") == 0) {
+        Serial.print("Consecutive build failures: ");
+        Serial.println(buildStory.consecutiveFailures());
+        return;
+    }
+    if (strcmp(command, "build reset") == 0) {
+        buildStory.reset();
+        Serial.println("Build failure history reset");
         return;
     }
     if (strcmp(command, "ambient on") == 0 ||
@@ -340,10 +355,21 @@ void handleCommand(const char* command, uint32_t nowMs) {
         demoEnabled = false;
         const bool success = strcmp(command, "event build-success") == 0;
         bond.build(success, nowMs);
-        reactions.buildResult(success, nowMs);
+        const deskpet_build_comedy::Cue cue =
+            buildStory.record(success, nowMs);
+        // Keep the manually chosen baseline. A button press or a direct
+        // Serial mood command can interrupt this little joke at any time.
+        reactions.showTemporary(cue.emotion, nowMs, cue.durationMs);
         syncReaction(nowMs);
-        Serial.println(success ? "Build OK -> Excited (4.5s)" :
-                                 "Build failed -> Furious (4.5s)");
+        Serial.print(success ? "Build OK -> " : "Build failed -> ");
+        Serial.print(emotionName(cue.emotion));
+        Serial.print(" (");
+        Serial.print(cue.durationMs / 1000u);
+        Serial.print(".");
+        Serial.print((cue.durationMs % 1000u) / 100u);
+        Serial.print("s, failure streak ");
+        Serial.print(buildStory.consecutiveFailures());
+        Serial.println(")");
         return;
     }
 
@@ -412,6 +438,7 @@ void setup() {
     }
     const uint32_t startedAt = millis();
     reactions.begin(startedAt);
+    buildStory.begin();
     bond.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0x682C95B3u);
     face.setAffection(bond.score());
     ambient.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0xB16B00B5u);
