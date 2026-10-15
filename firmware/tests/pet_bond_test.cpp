@@ -23,7 +23,7 @@ int main() {
     assert(pet.score() == 51u);
     pet.interact(1300u); // debounced; no reward for button spam
     assert(pet.score() == 51u);
-    pet.interact(3000u);
+    pet.interact(3200u); // past the 1.8-second cooldown
     assert(pet.score() == 52u);
     pet.surprise(4000u);
     assert(pet.score() == 54u);
