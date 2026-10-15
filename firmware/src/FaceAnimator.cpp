@@ -4,6 +4,7 @@
 #include "MoodPalette.h"
 #include "FuryGlow.h"
 #include "EmotionParticles.h"
+#include "ComicSkits.h"
 
 #include <math.h>
 
@@ -843,10 +844,10 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
             }
             bewilderedOffset = static_cast<int>(progress * 13.0f + 0.5f);
         }
-        int lookOffset = derp ? (isLeft ? 11 :
-            -10 + static_cast<int>(6.0f * sinf(
-                static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.0028f)))
-            : gremlin ? (isLeft ? 5 : -5)
+        const deskpet_comics::Frame skit = deskpet_comics::at(
+            visualEmotion_, animationNowMs_ - emotionStartedMs_);
+        int lookOffset = (derp || gremlin || panic)
+            ? (isLeft ? skit.leftPupil : skit.rightPupil)
             : bewildered ? bewilderedOffset
             : confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
@@ -1018,13 +1019,14 @@ void FaceAnimator::drawParticles(float openness) {
 void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
     if (sleeping_ || openness < 0.35f) return;
     const int mid = width_ / 2;
-    const uint32_t age = animationNowMs_ - emotionStartedMs_;
+    const deskpet_comics::Frame skit = deskpet_comics::at(
+        visualEmotion_, animationNowMs_ - emotionStartedMs_);
 
     if (visualEmotion_ == Emotion::Nerd) {
         // Comic-book spectacles. Their bridge and chunky lens frames read
         // clearly on the 320x170 IPS even without antialiasing.
         const uint16_t frame = 0xBDF7;
-        const int adjust = age % 4200u >= 3900u ? -2 : 0;
+        const int adjust = -skit.glassesLift;
         for (int side = -1; side <= 1; side += 2) {
             const int x = mid + side * 62 - 39;
             canvas_.drawRoundRect(x, eyeY - 37 + adjust, 78, 79, 27, frame);
@@ -1039,25 +1041,41 @@ void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
         canvas_.fillRect(mid - 9, eyeY + 30, 8, 10, kEye);
         canvas_.fillRect(mid + 2, eyeY + 30, 7, 13, kEye);
         canvas_.drawLine(mid - 1, eyeY + 30, mid - 1, eyeY + 41, kBackground);
+        if (skit.glint > 70u) {
+            const uint16_t shine = deskpet_mood::blend565(
+                kBackground, kEye, skit.glint);
+            canvas_.drawLine(mid + 62, eyeY - 29 + adjust,
+                             mid + 62, eyeY - 20 + adjust, shine);
+            canvas_.drawLine(mid + 57, eyeY - 25 + adjust,
+                             mid + 67, eyeY - 25 + adjust, shine);
+        }
     } else if (visualEmotion_ == Emotion::Derp) {
         canvas_.fillRoundRect(mid - 15, eyeY + 26, 30, 12, 5, kPupil);
-        const int sway = static_cast<int>(3.0f * sinf(age * 0.004f));
-        canvas_.fillRoundRect(mid + 2 + sway, eyeY + 30, 11, 16,
-                              5, 0xFB53); // pink tongue
-        canvas_.drawLine(mid + 8 + sway, eyeY + 40,
-                         mid + 8 + sway, eyeY + 44, 0xB948);
+        const int sway = skit.tongueSway;
+        const int tongueDrop = skit.tongueDrop;
+        canvas_.fillRoundRect(mid + 2 + sway, eyeY + 30 + tongueDrop,
+                              11, 12 + tongueDrop, 5, 0xFB53);
+        canvas_.drawLine(mid + 8 + sway, eyeY + 39 + tongueDrop,
+                         mid + 8 + sway, eyeY + 42 + tongueDrop, 0xB948);
     } else if (visualEmotion_ == Emotion::Gremlin) {
-        canvas_.fillRoundRect(mid - 18, eyeY + 25, 36, 18, 6, kPupil);
-        canvas_.drawLine(mid - 18, eyeY + 27, mid + 18,
-                         eyeY + 25, 0xBFC0); // green mischievous accent
-        canvas_.fillTriangle(mid - 15, eyeY + 28, mid - 7,
-                             eyeY + 28, mid - 10, eyeY + 39, kEye);
-        canvas_.fillRect(mid - 5, eyeY + 28, 7, 6, kEye);
-        canvas_.fillTriangle(mid + 8, eyeY + 27, mid + 16,
-                             eyeY + 27, mid + 11, eyeY + 39, kEye);
-        canvas_.fillCircle(mid + 20, eyeY + 23, 2, 0xBFC0);
+        const int grinY = eyeY + 25 - skit.grinLift;
+        canvas_.fillRoundRect(mid - 18, grinY, 36, 18, 6, kPupil);
+        canvas_.drawLine(mid - 18, grinY + 2, mid + 18,
+                         grinY, 0xBFC0); // green mischievous accent
+        canvas_.fillTriangle(mid - 15, grinY + 3, mid - 7,
+                             grinY + 3, mid - 10, grinY + 14, kEye);
+        canvas_.fillRect(mid - 5, grinY + 3, 7, 6, kEye);
+        canvas_.fillTriangle(mid + 8, grinY + 2, mid + 16,
+                             grinY + 2, mid + 11, grinY + 14, kEye);
+        canvas_.fillCircle(mid + 20, grinY - 2, 2, 0xBFC0);
+        if (skit.glint > 80u) {
+            const uint16_t gleam = deskpet_mood::blend565(
+                kBackground, 0xBFC0, skit.glint);
+            canvas_.drawLine(mid + 115, eyeY - 6, mid + 115, eyeY + 4, gleam);
+            canvas_.drawLine(mid + 110, eyeY - 1, mid + 120, eyeY - 1, gleam);
+        }
     } else if (visualEmotion_ == Emotion::Panic) {
-        const int shake = age / 65u % 2u == 0u ? -1 : 1;
+        const int shake = skit.jawShake;
         canvas_.fillRoundRect(mid - 16 + shake, eyeY + 27,
                               32, 17, 4, kPupil);
         for (int tooth = 0; tooth < 4; ++tooth) {
@@ -1065,7 +1083,7 @@ void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
                              eyeY + 29 + tooth % 2, 6, 7, kEye);
         }
         const int sweatX = mid + 117;
-        const int sweatY = eyeY - 18 + static_cast<int>(age % 1700u / 190u);
+        const int sweatY = eyeY - 18 + skit.sweatDrop;
         canvas_.fillCircle(sweatX, sweatY + 6, 5, 0x9E7F);
         canvas_.fillTriangle(sweatX, sweatY - 4, sweatX - 5, sweatY + 6,
                              sweatX + 5, sweatY + 6, 0x9E7F);
