@@ -82,6 +82,7 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     // visible shape, not an obsolete emotion or the initial pose.
     const Emotion from = visualEmotion_;
     emotion_ = emotion;
+    idleGesture_ = IdleGesture::None;
     emotionStartedMs_ = nowMs;
     sleeping_ = false;
     if (sassEnabled_) showQuip(nowMs);
@@ -147,6 +148,29 @@ bool FaceAnimator::showQuip(uint32_t nowMs) {
     return true;
 }
 
+void FaceAnimator::setIdleGesture(IdleGesture gesture, uint32_t startedMs) {
+    idleGesture_ = gesture;
+    idleStartedMs_ = startedMs;
+    lastFrameMs_ = 0;
+}
+
+float FaceAnimator::idleEnvelope() const {
+    if (sleeping_ || transitionActive_ ||
+        visualEmotion_ != Emotion::Neutral || idleGesture_ == IdleGesture::None) {
+        return 0.0f;
+    }
+    const uint32_t elapsed = animationNowMs_ - idleStartedMs_;
+    const uint32_t duration = IdleBehavior::duration(idleGesture_);
+    if (duration == 0u || elapsed >= duration) return 0.0f;
+
+    // Smooth ease in and out to preserve continuity when the ambient
+    // gesture begins or ends. No blocking waits or memory allocations.
+    const float attack = smoothStep(static_cast<float>(elapsed) / 340.0f);
+    const float release = smoothStep(
+        static_cast<float>(duration - elapsed) / 460.0f);
+    return attack < release ? attack : release;
+}
+
 void FaceAnimator::nextEmotion(uint32_t nowMs) {
     const auto next = (static_cast<uint8_t>(emotion_) + 1) %
                       static_cast<uint8_t>(Emotion::Count);
@@ -155,6 +179,7 @@ void FaceAnimator::nextEmotion(uint32_t nowMs) {
 
 void FaceAnimator::setSleeping(bool sleeping, uint32_t nowMs) {
     sleeping_ = sleeping;
+    idleGesture_ = IdleGesture::None;
     if (sleeping_) quipVisible_ = false;
     transitionActive_ = false;
     transitionOpenness_ = 1.0f;
@@ -463,7 +488,8 @@ void FaceAnimator::update(uint32_t nowMs) {
     animationNowMs_ = nowMs;
     updateTransition(nowMs);
 
-    if (!sleeping_ && deadlineReached(nowMs, nextLookMs_)) {
+    if (!sleeping_ && idleGesture_ == IdleGesture::None &&
+        deadlineReached(nowMs, nextLookMs_)) {
         targetGazeX_ = static_cast<float>(random(-13, 14));
         nextLookMs_ = nowMs + static_cast<uint32_t>(random(1200, 3600));
     }
@@ -505,7 +531,17 @@ void FaceAnimator::drawClosedEye(int centerX, int centerY) {
 
 void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft) {
     const EyePose& pose = eyes_[isLeft ? 0 : 1];
-    const float eyeOpen = clampFloat(openness * pose.openness, 0.0f, 1.0f);
+    const float ambient = idleEnvelope();
+    float eyeOpen = clampFloat(openness * pose.openness, 0.0f, 1.0f);
+    if (ambient > 0.0f) {
+        if (idleGesture_ == IdleGesture::Squint) {
+            eyeOpen *= 1.0f - 0.46f * ambient;
+        } else if (idleGesture_ == IdleGesture::Yawn) {
+            eyeOpen *= 1.0f - 0.76f * ambient;
+        } else if (idleGesture_ == IdleGesture::Wink && isLeft) {
+            eyeOpen *= 1.0f - 0.94f * ambient;
+        }
+    }
 
     // Both natural blinks and transition blinks finish in the same shape.
     if (sleeping_ || eyeOpen < 0.14f) {
@@ -571,7 +607,9 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool bewildered = visualEmotion_ == Emotion::Bewildered;
 
     const int eyeW = static_cast<int>(pose.width + 0.5f);
-    const int eyeH = static_cast<int>(pose.height * eyeOpen);
+    const int eyeH = static_cast<int>(
+        (pose.height + (idleGesture_ == IdleGesture::Startled
+                          ? 7.0f * ambient : 0.0f)) * eyeOpen);
     const int visibleH = eyeH < 6 ? 6 : eyeH;
     const int bounce = excited
         ? static_cast<int>(2.5f * sinf(
@@ -588,7 +626,9 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
 
     // Shrink pupils as Sleepy closes its eyelids; clip their radius
     // to the available eye height to prevent dark circles spilling out.
-    const int requestedRadius = static_cast<int>(pose.pupilRadius + 0.5f);
+    const int requestedRadius = static_cast<int>(
+        pose.pupilRadius + (idleGesture_ == IdleGesture::Startled
+                             ? 5.0f * ambient : 0.0f) + 0.5f);
     const int availableRadius = visibleH / 2 - 3;
     const int pupilRadius = requestedRadius < availableRadius
                                 ? requestedRadius : availableRadius;
@@ -630,11 +670,18 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
             }
             bewilderedOffset = static_cast<int>(progress * 13.0f + 0.5f);
         }
-        const int lookOffset = bewildered ? bewilderedOffset
+        int lookOffset = bewildered ? bewilderedOffset
             : confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
             : (bored || smug) ? (isLeft ? -6 : 8)
                             : static_cast<int>(gazeX_);
+        if (ambient > 0.0f &&
+            (idleGesture_ == IdleGesture::LookLeft ||
+             idleGesture_ == IdleGesture::LookRight)) {
+            const int side = idleGesture_ == IdleGesture::LookLeft ? -1 : 1;
+            lookOffset = static_cast<int>(
+                (1.0f - ambient) * gazeX_ + side * 16.0f * ambient);
+        }
         const int pupilX = centerX + lookOffset;
         const int pupilY = centerY + bounce +
                            ((curious || sad) ? -2 : (embarrassed ? 8 : 3));
@@ -672,8 +719,16 @@ void FaceAnimator::drawBrow(int centerX, uint8_t index, uint16_t color) {
     constexpr int kRadius = 2;
     for (int dx = -kHalfWidth; dx <= kHalfWidth; dx += 2) {
         const float t = static_cast<float>(dx) / kHalfWidth;
-        const float y = brow.y + brow.slope * t +
-                        brow.arch * (t * t - 1.0f);
+        const float ambient = idleEnvelope();
+        float y = brow.y + brow.slope * t +
+                  brow.arch * (t * t - 1.0f);
+        if (idleGesture_ == IdleGesture::Startled ||
+            idleGesture_ == IdleGesture::BrowBounce) {
+            const float bounce = idleGesture_ == IdleGesture::Startled ? 11.0f : 7.0f;
+            y -= bounce * ambient;
+        } else if (idleGesture_ == IdleGesture::Squint) {
+            y += 4.0f * ambient;
+        }
         canvas_.fillCircle(centerX + dx, static_cast<int>(y),
                            kRadius, color);
     }
@@ -714,6 +769,28 @@ void FaceAnimator::drawQuip() {
     deskpet_comic::draw(canvas_, boxX + 9, boxY + 5, phrase, kEye);
 }
 
+void FaceAnimator::drawIdleDetails(int eyeY) {
+    const float ambient = idleEnvelope();
+    if (ambient <= 0.05f) return;
+
+    if (idleGesture_ == IdleGesture::Yawn) {
+        // A sleepy oval mouth in the central gap between both eyes.
+        // Its lowest point is y=145, above the HUD beginning at y=153.
+        const int mouthX = width_ / 2;
+        const int mouthY = eyeY + 36;
+        const int radiusY = 3 + static_cast<int>(8.0f * ambient);
+        const int radiusX = 3 + static_cast<int>(5.0f * ambient);
+        canvas_.fillEllipse(mouthX, mouthY, radiusX, radiusY, kPupil);
+        canvas_.drawEllipse(mouthX, mouthY, radiusX, radiusY, kAccent);
+    } else if (idleGesture_ == IdleGesture::Startled) {
+        // A tiny punctuation dot hints at an unexpected sound/thought.
+        const int centerX = width_ / 2;
+        const int centerY = eyeY + 34;
+        const int radius = 1 + static_cast<int>(3.0f * ambient);
+        canvas_.fillCircle(centerX, centerY, radius, kAccent);
+    }
+}
+
 void FaceAnimator::render(float openness) {
     canvas_.fillScreen(kBackground);
 
@@ -728,6 +805,7 @@ void FaceAnimator::render(float openness) {
     const uint16_t browColor = expressive ? kAccent : kMuted;
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
+    drawIdleDetails(eyeY);
 
     // Decorations enter only with the visible shape, not at the start of
     // a topology-changing blink.
