@@ -3,25 +3,7 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 
-enum class Emotion : uint8_t {
-    Neutral = 0,
-    Happy,
-    Curious,
-    Surprised,
-    Sleepy,
-    Angry,
-    Sad,
-    Love,
-    Confused,
-    Excited,
-    Playful,
-    Smug,
-    Furious,
-    Embarrassed,
-    Dizzy,
-    Bored,
-    Count
-};
+#include "Emotion.h"
 
 const char* emotionName(Emotion emotion);
 
