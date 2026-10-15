@@ -83,7 +83,12 @@ bool FaceAnimator::deadlineReached(uint32_t nowMs, uint32_t deadlineMs) {
 
 void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     if (emotion == Emotion::Count) return;
-    if (emotion == emotion_ && !sleeping_) return;
+    if (emotion == emotion_ && !sleeping_) {
+        // Even selecting Neutral during the intro counts as interaction.
+        lifecycle_.interruptBoot(nowMs);
+        lastFrameMs_ = 0;
+        return;
+    }
 
     // A second command during a transition starts from the currently
     // visible shape, not an obsolete emotion or the initial pose.
