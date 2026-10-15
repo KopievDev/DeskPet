@@ -82,9 +82,9 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     const Emotion from = visualEmotion_;
     emotion_ = emotion;
     emotionStartedMs_ = nowMs;
+    sleeping_ = false;
     if (sassEnabled_) showQuip(nowMs);
     else quipVisible_ = false;
-    sleeping_ = false;
     blinking_ = false;
     nextBlinkMs_ = nowMs + 1300;
 
@@ -546,6 +546,11 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool excited = visualEmotion_ == Emotion::Excited;
     const bool curious = visualEmotion_ == Emotion::Curious;
     const bool sad = visualEmotion_ == Emotion::Sad;
+    const bool furious = visualEmotion_ == Emotion::Furious;
+    const bool dizzy = visualEmotion_ == Emotion::Dizzy;
+    const bool embarrassed = visualEmotion_ == Emotion::Embarrassed;
+    const bool bored = visualEmotion_ == Emotion::Bored;
+    const bool smug = visualEmotion_ == Emotion::Smug;
 
     const int eyeW = static_cast<int>(pose.width + 0.5f);
     const int eyeH = static_cast<int>(pose.height * eyeOpen);
@@ -554,6 +559,9 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         ? static_cast<int>(2.5f * sinf(
               static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.011f))
         : 0;
+    if (furious) {
+        centerX += (animationNowMs_ / 70u) % 2u == 0u ? -1 : 1;
+    }
     const int left = centerX - eyeW / 2;
     const int top = centerY - visibleH / 2 + bounce;
     const int radius = visibleH / 2 < eyeW / 2 ? visibleH / 2 : eyeW / 2;
@@ -566,13 +574,29 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const int availableRadius = visibleH / 2 - 3;
     const int pupilRadius = requestedRadius < availableRadius
                                 ? requestedRadius : availableRadius;
-    if (visibleH >= 20 && pupilRadius >= 3) {
+    if (dizzy && eyeOpen >= 0.3f) {
+        // Rotating cross-shaped pupils are unmistakably different from
+        // Confused's asymmetry and don't need trigonometric spiral raster.
+        const int spin = (animationNowMs_ / 180u) % 2u == 0u ? 1 : -1;
+        const int py = centerY + bounce;
+        const int arm = 11;
+        canvas_.drawLine(centerX - arm, py - arm * spin,
+                         centerX + arm, py + arm * spin, kPupil);
+        canvas_.drawLine(centerX - arm, py + arm * spin,
+                         centerX + arm, py - arm * spin, kPupil);
+        canvas_.drawLine(centerX - arm + 1, py - arm * spin,
+                         centerX + arm + 1, py + arm * spin, kPupil);
+        canvas_.drawLine(centerX - arm + 1, py + arm * spin,
+                         centerX + arm + 1, py - arm * spin, kPupil);
+    } else if (visibleH >= 20 && pupilRadius >= 3) {
         // Large surprised pupils cannot cross the white boundary.
         const int lookOffset = confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
-                        : static_cast<int>(gazeX_);
+            : (bored || smug) ? (isLeft ? -6 : 8)
+                            : static_cast<int>(gazeX_);
         const int pupilX = centerX + lookOffset;
-        const int pupilY = centerY + bounce + ((curious || sad) ? -2 : 3);
+        const int pupilY = centerY + bounce +
+                           ((curious || sad) ? -2 : (embarrassed ? 8 : 3));
         canvas_.fillCircle(pupilX, pupilY, pupilRadius, kPupil);
         if (pupilRadius >= 8) {
             canvas_.fillCircle(pupilX - 5, pupilY - 6, surprised ? 6 : 4, kEye);
@@ -614,6 +638,41 @@ void FaceAnimator::drawBrow(int centerX, uint8_t index, uint16_t color) {
     }
 }
 
+void FaceAnimator::drawQuip() {
+    if (!sassEnabled_ || !quipVisible_ || sleeping_) return;
+
+    const uint32_t elapsed = animationNowMs_ - quipStartedMs_;
+    if (elapsed >= kQuipDurationMs) {
+        quipVisible_ = false;
+        return;
+    }
+
+    const char* phrase = quipForEmotion(emotion_);
+    if (!phrase) return;
+    const int textWidth = deskpet_comic::width(phrase);
+    const int boxW = textWidth + 18;
+    // Center the bubble along the top edge, above the eye brows and
+    // between the fixed DeskPet logo at left and the right screen edge.
+    const int boxX = (width_ - boxW) / 2;
+    const float appear = smoothStep(static_cast<float>(elapsed) /
+                                     kQuipSlideMs);
+    const float leave = smoothStep(static_cast<float>(kQuipDurationMs - elapsed) /
+                                    kQuipSlideMs);
+    const float reveal = appear < leave ? appear : leave;
+    const int boxY = 3 - static_cast<int>((1.0f - reveal) * 22.0f);
+    if (boxY + 23 < 0) return;
+
+    canvas_.fillRoundRect(boxX, boxY, boxW, 23, 7, kPupil);
+    canvas_.drawRoundRect(boxX, boxY, boxW, 23, 7, kAccent);
+    // A tiny comic tail points into the space between the eyebrows.
+    if (reveal > 0.5f) {
+        canvas_.fillTriangle(width_ / 2 - 4, boxY + 21,
+                             width_ / 2 + 4, boxY + 21,
+                             width_ / 2 + 1, boxY + 29, kAccent);
+    }
+    deskpet_comic::draw(canvas_, boxX + 9, boxY + 5, phrase, kEye);
+}
+
 void FaceAnimator::render(float openness) {
     canvas_.fillScreen(kBackground);
 
@@ -623,8 +682,8 @@ void FaceAnimator::render(float openness) {
     drawEye(leftEyeX, eyeY, openness, true);
     drawEye(rightEyeX, eyeY, openness, false);
 
-    const bool expressive = emotion_ != Emotion::Neutral &&
-                            emotion_ != Emotion::Sleepy && !sleeping_;
+    const bool expressive = visualEmotion_ != Emotion::Neutral &&
+                            visualEmotion_ != Emotion::Sleepy && !sleeping_;
     const uint16_t browColor = expressive ? kAccent : kMuted;
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
@@ -654,6 +713,31 @@ void FaceAnimator::render(float openness) {
             }
         } else if (visualEmotion_ == Emotion::Playful) {
             canvas_.fillCircle(leftEyeX - 44, eyeY + 9, 3, kAccent);
+        } else if (visualEmotion_ == Emotion::Embarrassed) {
+            // Shy dotted cheeks; never overlap the lower status bar.
+            for (int side = -1; side <= 1; side += 2) {
+                const int x = width_ / 2 + side * 112;
+                for (int dot = 0; dot < 3; ++dot) {
+                    canvas_.fillCircle(x + (dot - 1) * 5,
+                                       eyeY + 12 + (dot % 2) * 3, 2, kAccent);
+                }
+            }
+        } else if (visualEmotion_ == Emotion::Furious) {
+            // Lightning bursts outside the eye silhouette.
+            for (int side = -1; side <= 1; side += 2) {
+                const int x = width_ / 2 + side * 111;
+                canvas_.drawLine(x - 2, eyeY - 22, x + 4, eyeY - 15, kAccent);
+                canvas_.drawLine(x + 4, eyeY - 15, x - 3, eyeY - 9, kAccent);
+            }
+        } else if (visualEmotion_ == Emotion::Smug) {
+            // Crooked little smirk in the gap between the eyes.
+            canvas_.drawLine(width_ / 2 - 11, eyeY + 28,
+                             width_ / 2 + 8, eyeY + 32, kAccent);
+            canvas_.fillCircle(width_ / 2 + 9, eyeY + 30, 2, kAccent);
+        } else if (visualEmotion_ == Emotion::Bored) {
+            // Two tiny dots indicate a low-energy sigh.
+            canvas_.fillCircle(width_ / 2 - 5, eyeY + 31, 2, kMuted);
+            canvas_.fillCircle(width_ / 2 + 5, eyeY + 31, 2, kMuted);
         }
     }
 
@@ -667,5 +751,6 @@ void FaceAnimator::render(float openness) {
     canvas_.setCursor(width_ - 80, height_ - 17);
     canvas_.print("v0.1");
 
+    drawQuip(); // overlay after HUD; does not obscure the large eyes
     canvas_.pushSprite(0, 0);
 }
