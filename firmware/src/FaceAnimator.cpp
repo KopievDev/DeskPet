@@ -575,19 +575,24 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const int pupilRadius = requestedRadius < availableRadius
                                 ? requestedRadius : availableRadius;
     if (dizzy && eyeOpen >= 0.3f) {
-        // Rotating cross-shaped pupils are unmistakably different from
-        // Confused's asymmetry and don't need trigonometric spiral raster.
-        const int spin = (animationNowMs_ / 180u) % 2u == 0u ? 1 : -1;
+        // Switch between X and + pupils. Flipping two diagonal slopes
+        // draws the same X, so alternate actual silhouettes to imply spin.
+        const bool diagonal = (animationNowMs_ / 170u) % 2u == 0u;
         const int py = centerY + bounce;
         const int arm = 11;
-        canvas_.drawLine(centerX - arm, py - arm * spin,
-                         centerX + arm, py + arm * spin, kPupil);
-        canvas_.drawLine(centerX - arm, py + arm * spin,
-                         centerX + arm, py - arm * spin, kPupil);
-        canvas_.drawLine(centerX - arm + 1, py - arm * spin,
-                         centerX + arm + 1, py + arm * spin, kPupil);
-        canvas_.drawLine(centerX - arm + 1, py + arm * spin,
-                         centerX + arm + 1, py - arm * spin, kPupil);
+        if (diagonal) {
+            canvas_.drawLine(centerX - arm, py - arm,
+                             centerX + arm, py + arm, kPupil);
+            canvas_.drawLine(centerX - arm, py + arm,
+                             centerX + arm, py - arm, kPupil);
+            canvas_.drawLine(centerX - arm + 1, py - arm,
+                             centerX + arm + 1, py + arm, kPupil);
+            canvas_.drawLine(centerX - arm + 1, py + arm,
+                             centerX + arm + 1, py - arm, kPupil);
+        } else {
+            canvas_.fillRect(centerX - 1, py - arm, 3, 2 * arm + 1, kPupil);
+            canvas_.fillRect(centerX - arm, py - 1, 2 * arm + 1, 3, kPupil);
+        }
     } else if (visibleH >= 20 && pupilRadius >= 3) {
         // Large surprised pupils cannot cross the white boundary.
         const int lookOffset = confused ? (isLeft ? -8 : 7)
