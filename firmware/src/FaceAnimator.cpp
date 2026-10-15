@@ -81,12 +81,16 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     // Rectangles can smoothly morph their geometry. Curved smile lines,
     // hearts and winks have a different topology: conceal the shape change
     // in a short closing/reopening eyelid animation.
-    transitionActive_ = hasSpecialEyeShape(from) ||
+    // Preserve the current lid opening if a new emotion interrupts an
+    // earlier transition: no single-frame pop back to fully open eyes.
+    const bool wasTransitioning = transitionActive_;
+    transitionStartOpenness_ = wasTransitioning ? transitionOpenness_ : 1.0f;
+    transitionActive_ = wasTransitioning || hasSpecialEyeShape(from) ||
                         hasSpecialEyeShape(emotion);
     transitionRevealed_ = false;
     transitionFrom_ = from;
     transitionStartedMs_ = nowMs;
-    transitionOpenness_ = 1.0f;
+    transitionOpenness_ = transitionStartOpenness_;
     if (!transitionActive_) visualEmotion_ = emotion;
     lastFrameMs_ = 0;
 }
@@ -101,6 +105,7 @@ void FaceAnimator::setSleeping(bool sleeping, uint32_t nowMs) {
     sleeping_ = sleeping;
     transitionActive_ = false;
     transitionOpenness_ = 1.0f;
+    transitionStartOpenness_ = 1.0f;
     visualEmotion_ = emotion_;
     blinking_ = false;
     nextBlinkMs_ = nowMs + 2500;
@@ -192,7 +197,8 @@ void FaceAnimator::updateTransition(uint32_t nowMs) {
     const float phase = static_cast<float>(elapsed) / kSpecialTransitionMs;
     if (phase < 0.5f) {
         visualEmotion_ = transitionFrom_;
-        transitionOpenness_ = 1.0f - smoothStep(phase * 2.0f);
+        transitionOpenness_ = transitionStartOpenness_ *
+                               (1.0f - smoothStep(phase * 2.0f));
     } else {
         visualEmotion_ = emotion_;
         transitionOpenness_ = smoothStep((phase - 0.5f) * 2.0f);
