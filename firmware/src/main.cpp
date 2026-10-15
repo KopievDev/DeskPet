@@ -168,6 +168,7 @@ void showStatus() {
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic");
+        Serial.println("Comic preview: comic next (Nerd -> Derp -> Gremlin -> Panic)");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
         Serial.println("Buttons: USER tap next; double-tap surprise; hold pet LOVE");
         Serial.println("Buttons: BOOT tap sleep/wake; hold cycle calm/playful/cheeky");
@@ -182,6 +183,29 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "status") == 0) {
         showStatus();
+        return;
+    }
+    if (strcmp(command, "comic next") == 0) {
+        // Rapid preview of the four acting scenes without running
+        // through all 21 moods in USER/demo order.
+        constexpr Emotion comicMoods[] = {
+            Emotion::Nerd, Emotion::Derp, Emotion::Gremlin, Emotion::Panic
+        };
+        Emotion next = comicMoods[0];
+        for (uint8_t i = 0; i < 4u; ++i) {
+            if (reactions.manualEmotion() == comicMoods[i]) {
+                next = comicMoods[(i + 1u) % 4u];
+                break;
+            }
+        }
+        cancelAmbient(nowMs);
+        demoEnabled = false;
+        reactions.chooseEmotion(next, nowMs);
+        bond.interact(nowMs);
+        if (face.isSleeping()) face.setSleeping(false, nowMs);
+        syncReaction(nowMs);
+        Serial.print("Comic: ");
+        Serial.println(emotionName(next));
         return;
     }
     if (strcmp(command, "bond status") == 0) {
