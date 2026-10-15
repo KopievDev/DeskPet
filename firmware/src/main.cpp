@@ -291,7 +291,7 @@ void setup() {
     }
     const uint32_t startedAt = millis();
     reactions.begin(startedAt);
-    ambient.begin(startedAt, static_cast<uint32_t>(esp_random()));
+    ambient.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0xB16B00B5u);
     Serial.println("DeskPet 0.1 ready. Type help.");
 }
 
