@@ -80,7 +80,13 @@ assert "bool tick(uint32_t nowMs, bool eligible)" in ambient
 assert "idleGesture_ = gesture;" in face_cpp
 assert "float FaceAnimator::idleEnvelope() const" in face_cpp
 assert "void FaceAnimator::drawIdleDetails(int eyeY)" in face_cpp
-assert "ambient.tick(now, allowAmbient)" in serial
+# The bond cameo may start a transient reaction in the same loop tick.
+# In that case ambient must be gated again, rather than overriding the cameo.
+assert re.search(
+    r"ambient\.tick\(\s*now\s*,\s*allowAmbient\s*&&\s*"
+    r"!reactions\.reactionActive\(\)\s*\)",
+    serial,
+), "Ambient must not overwrite a newly triggered PetBond cameo"
 assert "reactions.manualEmotion() == Emotion::Neutral" in serial
 assert "reactions.reactionActive()" in serial
 assert "reactions.idleActive()" in serial
