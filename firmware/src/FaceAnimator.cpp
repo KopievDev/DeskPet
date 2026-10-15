@@ -1016,6 +1016,45 @@ void FaceAnimator::drawParticles(float openness) {
     }
 }
 
+void FaceAnimator::drawNeedPrompt(int eyeY, float openness) {
+    if (sleeping_ || openness <= 0.35f ||
+        needPrompt_ == deskpet_needs::Kind::None) return;
+
+    // A little icon in the LEFT gutter, kept away from eyes (x~60..260)
+    // and the bottom HUD (y>=153). Pure RGB565 strokes, no extra sprite.
+    const int x = 17;
+    const int y = eyeY + 13; // typical y=108
+    const uint32_t phase = (animationNowMs_ / 170u) % 5u;
+    if (needPrompt_ == deskpet_needs::Kind::Coffee) {
+        constexpr uint16_t kCup = 0xFEEE; // warm cream
+        constexpr uint16_t kSteam = 0x8E1B; // soft cyan
+        canvas_.drawRoundRect(x, y, 17, 13, 3, kCup);
+        canvas_.fillRect(x + 3, y + 3, 11, 6, 0x6A23);
+        canvas_.drawCircle(x + 19, y + 5, 5, kCup);
+        canvas_.drawLine(x - 2, y + 14, x + 21, y + 14, kCup);
+        for (int i = 0; i < 2; ++i) {
+            const int steamX = x + 5 + i * 7;
+            const int floatY = static_cast<int>((phase + i * 2u) % 5u);
+            canvas_.drawLine(steamX, y - 5 - floatY,
+                             steamX + 2, y - 9 - floatY, kSteam);
+        }
+    } else if (needPrompt_ == deskpet_needs::Kind::Attention) {
+        // A bouncing comic exclamation mark.
+        const int jump = static_cast<int>((phase + 1u) % 3u);
+        constexpr uint16_t kOrange = 0xFD04;
+        canvas_.fillRoundRect(x + 8, y - 7 - jump,
+                              5, 15, 2, kOrange);
+        canvas_.fillCircle(x + 10, y + 12 - jump, 3, kOrange);
+        canvas_.drawCircle(x + 10, y + 2 - jump, 16, kMuted);
+    } else if (needPrompt_ == deskpet_needs::Kind::Cheer) {
+        // A tiny star replacing any floating text at this resolution.
+        const int pulse = 5 + static_cast<int>(phase % 3u);
+        canvas_.drawLine(x + 10, y - pulse, x + 10, y + pulse, kAccent);
+        canvas_.drawLine(x + 10 - pulse, y, x + 10 + pulse, y, kAccent);
+        canvas_.fillCircle(x + 10, y, 2, kEye);
+    }
+}
+
 void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
     if (sleeping_ || openness < 0.35f) return;
     const int mid = width_ / 2;
@@ -1195,6 +1234,7 @@ void FaceAnimator::render(float openness) {
     drawBrow(rightEyeX, 1, browColor);
     drawIdleDetails(eyeY);
     drawComicFeatures(eyeY, openness);
+    drawNeedPrompt(eyeY, openness);
     drawParticles(openness);
 
     // Decorations enter only with the visible shape, not at the start of
@@ -1305,6 +1345,16 @@ void FaceAnimator::render(float openness) {
 
     canvas_.setCursor(10, height_ - 17);
     canvas_.print(sleeping_ ? "SLEEPING" : emotionName(emotion_));
+    // Compact gameplay HUD. Values are local RAM-only game state.
+    // E=energy, M=mood, T=attention; fit between emotion and affection.
+    canvas_.setCursor(90, height_ - 17);
+    canvas_.print("E");
+    canvas_.print(energy_);
+    canvas_.print(" M");
+    canvas_.print(mood_);
+    canvas_.print(" T");
+    canvas_.print(attention_);
+
     // Compact, unobtrusive affection meter; no score persisted to flash.
     canvas_.setCursor(width_ - 114, height_ - 17);
     canvas_.print("A:");
