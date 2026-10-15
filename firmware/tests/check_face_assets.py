@@ -174,6 +174,8 @@ assert "kSleepDurationMs = 850u" in lifecycle
 assert "kWakeDurationMs = 1050u" in lifecycle
 assert "startOpening_ = openness(nowMs);" in lifecycle, "Interrupted transitions must not jump"
 assert "float openness(uint32_t nowMs) const" in lifecycle
+assert "inline const char* phaseName(Phase phase)" in lifecycle
+assert "face.lifecycleName()" in serial
 assert "deskpet_lifecycle::Timeline lifecycle_;" in face_header
 assert "return lifecycle_.sleeping();" in face_header
 assert "lifecycle_.begin(now);" in source
