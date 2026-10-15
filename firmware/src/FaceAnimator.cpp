@@ -1015,6 +1015,63 @@ void FaceAnimator::drawParticles(float openness) {
     }
 }
 
+void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
+    if (sleeping_ || openness < 0.35f) return;
+    const int mid = width_ / 2;
+    const uint32_t age = animationNowMs_ - emotionStartedMs_;
+
+    if (visualEmotion_ == Emotion::Nerd) {
+        // Comic-book spectacles. Their bridge and chunky lens frames read
+        // clearly on the 320x170 IPS even without antialiasing.
+        const uint16_t frame = 0xBDF7;
+        const int adjust = age % 4200u >= 3900u ? -2 : 0;
+        for (int side = -1; side <= 1; side += 2) {
+            const int x = mid + side * 62 - 39;
+            canvas_.drawRoundRect(x, eyeY - 37 + adjust, 78, 79, 27, frame);
+            canvas_.drawRoundRect(x + 1, eyeY - 36 + adjust, 76, 77, 26, frame);
+            canvas_.drawLine(x + 12, eyeY - 23 + adjust,
+                             x + 24, eyeY - 29 + adjust, kEye);
+        }
+        canvas_.drawLine(mid - 23, eyeY - 18 + adjust,
+                         mid + 23, eyeY - 18 + adjust, frame);
+        canvas_.drawLine(mid - 12, eyeY + 28, mid + 13, eyeY + 29, kMuted);
+        // Awkward, unequal front teeth with a visibly crooked bottom edge.
+        canvas_.fillRect(mid - 9, eyeY + 30, 8, 10, kEye);
+        canvas_.fillRect(mid + 2, eyeY + 30, 7, 13, kEye);
+        canvas_.drawLine(mid - 1, eyeY + 30, mid - 1, eyeY + 41, kBackground);
+    } else if (visualEmotion_ == Emotion::Derp) {
+        canvas_.fillRoundRect(mid - 15, eyeY + 26, 30, 12, 5, kPupil);
+        const int sway = static_cast<int>(3.0f * sinf(age * 0.004f));
+        canvas_.fillRoundRect(mid + 2 + sway, eyeY + 30, 11, 16,
+                              5, 0xFB53); // pink tongue
+        canvas_.drawLine(mid + 8 + sway, eyeY + 40,
+                         mid + 8 + sway, eyeY + 44, 0xB948);
+    } else if (visualEmotion_ == Emotion::Gremlin) {
+        canvas_.fillRoundRect(mid - 18, eyeY + 25, 36, 18, 6, kPupil);
+        canvas_.drawLine(mid - 18, eyeY + 27, mid + 18,
+                         eyeY + 25, 0xBFC0); // green mischievous accent
+        canvas_.fillTriangle(mid - 15, eyeY + 28, mid - 7,
+                             eyeY + 28, mid - 10, eyeY + 39, kEye);
+        canvas_.fillRect(mid - 5, eyeY + 28, 7, 6, kEye);
+        canvas_.fillTriangle(mid + 8, eyeY + 27, mid + 16,
+                             eyeY + 27, mid + 11, eyeY + 39, kEye);
+        canvas_.fillCircle(mid + 20, eyeY + 23, 2, 0xBFC0);
+    } else if (visualEmotion_ == Emotion::Panic) {
+        const int shake = age / 65u % 2u == 0u ? -1 : 1;
+        canvas_.fillRoundRect(mid - 16 + shake, eyeY + 27,
+                              32, 17, 4, kPupil);
+        for (int tooth = 0; tooth < 4; ++tooth) {
+            canvas_.fillRect(mid - 13 + tooth * 7 + shake,
+                             eyeY + 29 + tooth % 2, 6, 7, kEye);
+        }
+        const int sweatX = mid + 117;
+        const int sweatY = eyeY - 18 + static_cast<int>(age % 1700u / 190u);
+        canvas_.fillCircle(sweatX, sweatY + 6, 5, 0x9E7F);
+        canvas_.fillTriangle(sweatX, sweatY - 4, sweatX - 5, sweatY + 6,
+                             sweatX + 5, sweatY + 6, 0x9E7F);
+    }
+}
+
 void FaceAnimator::drawIdleDetails(int eyeY) {
     const float ambient = idleEnvelope();
     if (ambient <= 0.05f) return;
@@ -1114,6 +1171,7 @@ void FaceAnimator::render(float openness) {
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
     drawIdleDetails(eyeY);
+    drawComicFeatures(eyeY, openness);
     drawParticles(openness);
 
     // Decorations enter only with the visible shape, not at the start of
