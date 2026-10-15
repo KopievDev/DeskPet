@@ -16,6 +16,7 @@ static bool same(const Frame& a, const Frame& b) {
            a.grinLift == b.grinLift &&
            a.jawShake == b.jawShake &&
            a.sweatDrop == b.sweatDrop &&
+           a.sweatAlpha == b.sweatAlpha &&
            a.glint == b.glint;
 }
 
@@ -38,6 +39,7 @@ int main() {
             assert(a.grinLift >= 0 && a.grinLift <= 5);
             assert(a.jawShake >= -2 && a.jawShake <= 2);
             assert(a.sweatDrop >= 0 && a.sweatDrop <= 11);
+            assert(a.sweatAlpha <= 255u);
         }
     }
     assert(!isComic(Emotion::Neutral));
@@ -70,8 +72,11 @@ int main() {
     // Panic has the frantic rhythm; it resets at the scene boundary.
     const Frame nervous = at(Emotion::Panic, 100u);
     assert(nervous.jawShake != 0);
-    assert(at(Emotion::Panic, 1949u).sweatDrop >= 10);
-    assert(at(Emotion::Panic, 1950u).sweatDrop == 0);
+    assert(at(Emotion::Panic, 1580u).sweatDrop >= 10);
+    assert(at(Emotion::Panic, 1580u).sweatAlpha < 30u);
+    assert(at(Emotion::Panic, 1600u).sweatDrop == 0);
+    assert(at(Emotion::Panic, 1600u).sweatAlpha == 0u);
+    assert(at(Emotion::Panic, 1800u).sweatAlpha == 255u);
 
     // Unsigned arithmetic is safe for elapsed time across millis() rollover.
     const uint32_t nearWrap = UINT32_MAX - 1000u;
