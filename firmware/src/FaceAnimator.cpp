@@ -303,7 +303,11 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         if (angry) pupilRadius = 12;
         if (confused) pupilRadius = isLeft ? 15 : 11;
         if (excited) pupilRadius = 18;
-        const int lookOffset = confused ? (isLeft ? -8 : 7) : static_cast<int>(gazeX_);
+        // Surprised pupils are large: limit gaze so they stay within
+        // the white eye silhouette even at the extremes of eye movement.
+        const int lookOffset = confused ? (isLeft ? -8 : 7)
+            : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
+                        : static_cast<int>(gazeX_);
         const int pupilX = centerX + lookOffset;
         const int pupilY = centerY + bounce + ((curious || sad) ? -2 : 3);
         canvas_.fillCircle(pupilX, pupilY, pupilRadius, kPupil);
