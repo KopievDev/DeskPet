@@ -365,83 +365,83 @@ void FaceAnimator::drawClosedEye(int centerX, int centerY) {
 }
 
 void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft) {
-    // All expressive shapes flatten to a simple lid during a full blink.
-    if (sleeping_ || openness < 0.14f) {
+    const EyePose& pose = eyes_[isLeft ? 0 : 1];
+    const float eyeOpen = clampFloat(openness * pose.openness, 0.0f, 1.0f);
+
+    // Both natural blinks and transition blinks finish in the same shape.
+    if (sleeping_ || eyeOpen < 0.14f) {
         drawClosedEye(centerX, centerY);
         return;
     }
 
-    if (emotion_ == Emotion::Happy) {
-        // Smooth, upward smiling eyelids, instead of hollow rectangles.
+    if (visualEmotion_ == Emotion::Happy) {
+        // Flatten smile arches as lids close, then restore them on opening.
         constexpr int kSpan = 30;
         for (int dx = -kSpan; dx <= kSpan; dx += 2) {
             const float t = static_cast<float>(dx) / kSpan;
-            const int y = centerY + static_cast<int>((-15.0f + 23.0f * t * t) * openness);
+            const int y = centerY +
+                static_cast<int>((-15.0f + 23.0f * t * t) * eyeOpen);
             canvas_.fillCircle(centerX + dx, y, 6, kEye);
         }
         return;
     }
 
-    if (emotion_ == Emotion::Love) {
-        // Pulsing heart eyes. Keep the entire silhouette inside 320x170.
+    if (visualEmotion_ == Emotion::Love) {
+        // Heart eyes pulse while idle and shrink vertically as they blink.
         const float beat = sinf(static_cast<float>(animationNowMs_ - emotionStartedMs_) *
                                 0.006f);
-        const int radius = 14 + static_cast<int>(1.5f * (1.0f + beat));
-        const int topY = centerY - 10;
-        canvas_.fillCircle(centerX - 13, topY, radius, kAccent);
-        canvas_.fillCircle(centerX + 13, topY, radius, kAccent);
-        canvas_.fillTriangle(centerX - 28, topY - 3,
-                             centerX + 28, topY - 3,
-                             centerX, centerY + 31, kAccent);
+        const int radius = static_cast<int>((14.0f + 1.5f * (1.0f + beat)) *
+                                            eyeOpen);
+        const int topY = centerY - static_cast<int>(10.0f * eyeOpen);
+        const int topSpan = static_cast<int>(13.0f * eyeOpen);
+        const int halfBase = static_cast<int>(28.0f * eyeOpen);
+        canvas_.fillCircle(centerX - topSpan, topY, radius, kAccent);
+        canvas_.fillCircle(centerX + topSpan, topY, radius, kAccent);
+        canvas_.fillTriangle(centerX - halfBase, topY - 3,
+                             centerX + halfBase, topY - 3,
+                             centerX, centerY + static_cast<int>(31.0f * eyeOpen),
+                             kAccent);
         return;
     }
 
-    if (emotion_ == Emotion::Playful && isLeft) {
-        // The left eye stays in a crooked wink, the right looks at the user.
+    if (visualEmotion_ == Emotion::Playful && isLeft) {
+        // The wink flattens during transition instead of abruptly vanishing.
         for (int dx = -28; dx <= 28; dx += 2) {
             const float t = static_cast<float>(dx) / 28.0f;
-            const int y = centerY + 5 + static_cast<int>(5.0f * t * t + 3.0f * t);
-            canvas_.fillCircle(centerX + dx, y, 4, kEye);
+            const int y = centerY + static_cast<int>(
+                (5.0f + 5.0f * t * t + 3.0f * t) * eyeOpen);
+            canvas_.fillCircle(centerX + dx, y,
+                               2 + static_cast<int>(2.0f * eyeOpen), kEye);
         }
         return;
     }
 
-    const bool surprised = emotion_ == Emotion::Surprised;
-    const bool curious = emotion_ == Emotion::Curious;
-    const bool sleepy = emotion_ == Emotion::Sleepy;
-    const bool angry = emotion_ == Emotion::Angry;
-    const bool sad = emotion_ == Emotion::Sad;
-    const bool confused = emotion_ == Emotion::Confused;
-    const bool excited = emotion_ == Emotion::Excited;
-    const bool playful = emotion_ == Emotion::Playful;
+    // All remaining expressions use the same parameterized silhouette.
+    // Width, height, opening, pupil size and each sloping eyelid morph
+    // continuously, including interruptions by rapid new commands.
+    const bool surprised = visualEmotion_ == Emotion::Surprised;
+    const bool sleepy = visualEmotion_ == Emotion::Sleepy;
+    const bool confused = visualEmotion_ == Emotion::Confused;
+    const bool excited = visualEmotion_ == Emotion::Excited;
+    const bool curious = visualEmotion_ == Emotion::Curious;
+    const bool sad = visualEmotion_ == Emotion::Sad;
 
-    float asymmetricOpen = curious && !isLeft ? 0.79f : 1.0f;
-    if (confused && !isLeft) asymmetricOpen = 0.61f;
-    if (sad) asymmetricOpen = isLeft ? 0.88f : 0.95f;
-
-    const int eyeW = surprised ? 66 : (excited ? 70 : 72);
-    const int fullHeight = surprised ? 79 : (excited ? 78 : 74);
-    const int eyeH = static_cast<int>(fullHeight * openness * asymmetricOpen);
+    const int eyeW = static_cast<int>(pose.width + 0.5f);
+    const int eyeH = static_cast<int>(pose.height * eyeOpen);
     const int visibleH = eyeH < 6 ? 6 : eyeH;
     const int bounce = excited
-        ? static_cast<int>(2.5f * sinf(static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.011f))
+        ? static_cast<int>(2.5f * sinf(
+              static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.011f))
         : 0;
     const int left = centerX - eyeW / 2;
     const int top = centerY - visibleH / 2 + bounce;
-    const int radius = visibleH / 2 < eyeW / 2
-                           ? visibleH / 2 : eyeW / 2;
+    const int radius = visibleH / 2 < eyeW / 2 ? visibleH / 2 : eyeW / 2;
 
     canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, kEye);
 
-    // No floating pupil inside a narrow drowsy eyelid.
     if (!sleepy && visibleH >= 24) {
-        int pupilRadius = 15;
-        if (surprised) pupilRadius = 21;  // deliberately much larger than neutral
-        if (angry) pupilRadius = 12;
-        if (confused) pupilRadius = isLeft ? 15 : 11;
-        if (excited) pupilRadius = 18;
-        // Surprised pupils are large: limit gaze so they stay within
-        // the white eye silhouette even at the extremes of eye movement.
+        const int pupilRadius = static_cast<int>(pose.pupilRadius + 0.5f);
+        // Large surprised pupils cannot cross the white boundary.
         const int lookOffset = confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
                         : static_cast<int>(gazeX_);
@@ -454,45 +454,20 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         }
     }
 
-    // Emotion-specific upper lids. Triangular background masks never
-    // touch neighboring eyes or the status text.
-    if ((curious || confused) && visibleH > 25) {
-        if (isLeft) {
+    // Two continuous lid-cut parameters replace hard-coded emotion masks.
+    // Avoid cutting a still-closed sliver; the full closed eye is handled
+    // above. Both cuts can animate independently without switching shapes.
+    if (visibleH > 14) {
+        const int cutLeft = static_cast<int>(pose.lidLeft * eyeOpen + 0.5f);
+        const int cutRight = static_cast<int>(pose.lidRight * eyeOpen + 0.5f);
+        if (cutLeft > 0) {
             canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left, top + 6, kBackground);
-        } else {
-            canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left + eyeW, top + (confused ? 17 : 12), kBackground);
+                                 left, top + cutLeft, kBackground);
         }
-    } else if (sleepy && visibleH > 14) {
-        if (isLeft) {
+        if (cutRight > 0) {
             canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left, top + 9, kBackground);
-        } else {
-            canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left + eyeW, top + 9, kBackground);
+                                 left + eyeW, top + cutRight, kBackground);
         }
-    } else if (angry && visibleH > 25) {
-        // Inner edges drop down, making a recognizable angry / shape.
-        if (isLeft) {
-            canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left + eyeW, top + 23, kBackground);
-        } else {
-            canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left, top + 23, kBackground);
-        }
-    } else if (sad && visibleH > 25) {
-        // Opposite of angry: inner corners lift, outer corners droop.
-        if (isLeft) {
-            canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left, top + 13, kBackground);
-        } else {
-            canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left + eyeW, top + 13, kBackground);
-        }
-    } else if (playful && visibleH > 25) {
-        canvas_.fillTriangle(left, top, left + eyeW, top,
-                             left, top + 6, kBackground);
     }
 }
 
@@ -526,12 +501,13 @@ void FaceAnimator::render(float openness) {
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
 
-    // A few inexpensive visual accents keep expressive moods distinct.
+    // Decorations enter only with the visible shape, not at the start of
+    // a topology-changing blink.
     if (!sleeping_ && openness > 0.35f) {
-        if (emotion_ == Emotion::Happy || emotion_ == Emotion::Love) {
+        if (visualEmotion_ == Emotion::Happy || visualEmotion_ == Emotion::Love) {
             canvas_.fillCircle(leftEyeX - 47, eyeY + 13, 3, kAccent);
             canvas_.fillCircle(rightEyeX + 47, eyeY + 13, 3, kAccent);
-        } else if (emotion_ == Emotion::Sad) {
+        } else if (visualEmotion_ == Emotion::Sad) {
             // A single falling tear; position is always above the HUD.
             const int drop = static_cast<int>(
                 ((animationNowMs_ - emotionStartedMs_) / 45u) % 12u);
@@ -539,7 +515,7 @@ void FaceAnimator::render(float openness) {
             canvas_.fillTriangle(rightEyeX + 26, eyeY + 24 + drop,
                                  rightEyeX + 32, eyeY + 24 + drop,
                                  rightEyeX + 29, eyeY + 17 + drop, kAccent);
-        } else if (emotion_ == Emotion::Excited) {
+        } else if (visualEmotion_ == Emotion::Excited) {
             // Twin sparkles at the outer edges, blinking independently.
             const int spark = (animationNowMs_ / 180u) % 2u == 0u ? 6 : 3;
             for (int side = -1; side <= 1; side += 2) {
@@ -548,7 +524,7 @@ void FaceAnimator::render(float openness) {
                 canvas_.fillRect(sx - 1, sy - spark, 3, 2 * spark + 1, kAccent);
                 canvas_.fillRect(sx - spark, sy - 1, 2 * spark + 1, 3, kAccent);
             }
-        } else if (emotion_ == Emotion::Playful) {
+        } else if (visualEmotion_ == Emotion::Playful) {
             canvas_.fillCircle(leftEyeX - 44, eyeY + 9, 3, kAccent);
         }
     }
