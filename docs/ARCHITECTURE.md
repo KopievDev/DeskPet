@@ -27,7 +27,7 @@ The current implementation has **no Wi-Fi, audio, AI API, cloud service, OTA or 
 
 ## Technology choices
 
-For 0.1: **PlatformIO / Arduino framework / LILYGO LovyanGFX board profile**. This gives a correct ST7789V 8-bit-parallel pin map and LCD power/backlight initialization without maintaining a fork of the official graphics driver.
+For 0.1: **PlatformIO / Arduino framework / LovyanGFX 1.2.33** and the project-local adapter `firmware/include/DeskPetTDisplayS3.h`. It reproduces the official LILYGO ST7789V 8-bit parallel pin map, LCD power-enable and PWM backlight config, but uses `Bus_Parallel8::config_t::port = 0` for the ESP32-S3 LCD_CAM peripheral. The vendor library's `i2s_port` field does not exist in LovyanGFX 1.2.33's ESP32-S3 bus. Build must be verified on the user's hardware; do not modify files inside `.pio`.
 
 After validating the hardware, evaluate a migration to **ESP-IDF + LVGL** for UI complexity, networking, audio and OTA. Do not migrate solely for architecture aesthetics.
 
