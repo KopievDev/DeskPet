@@ -165,5 +165,32 @@ assert "kHeartPixels[6]" in source
 assert "canvas_.drawLine(x - 2, y + 3, x + 1, y + 1, color)" in source
 assert (ROOT / "tests/emotion_particles_test.cpp").is_file()
 
+lifecycle = (ROOT / "include/FaceLifecycle.h").read_text(encoding="utf-8")
+assert "class Timeline" in lifecycle
+for phase in ("Booting", "Awake", "FallingAsleep", "Asleep", "Waking"):
+    assert phase in lifecycle, f"Missing lifecycle phase: {phase}"
+assert "kBootDurationMs = 1600u" in lifecycle
+assert "kSleepDurationMs = 850u" in lifecycle
+assert "kWakeDurationMs = 1050u" in lifecycle
+assert "startOpening_ = openness(nowMs);" in lifecycle, "Interrupted transitions must not jump"
+assert "float openness(uint32_t nowMs) const" in lifecycle
+assert "deskpet_lifecycle::Timeline lifecycle_;" in face_header
+assert "return lifecycle_.sleeping();" in face_header
+assert "lifecycle_.begin(now);" in source
+assert "lifecycle_.advance(nowMs);" in source
+assert "lifecycle_.sleep(nowMs);" in source
+assert "lifecycle_.wake(nowMs);" in source
+assert "lifecycle_.interruptBoot(nowMs);" in source
+assert "lifecycle_.openness(nowMs) * (1.0f - blink * 0.94f)" in source
+assert "if (eyeOpen < 0.14f)" in source, "Sleep should close eyes gradually"
+assert "if (sleeping_ || eyeOpen < 0.14f)" not in source
+assert "void FaceAnimator::drawLifecycleOverlay()" in source
+assert "drawLifecycleOverlay();" in source
+assert "canvas_.print(\"HELLO!\");" in source
+assert 'canvas_.print("z");' in source
+assert 'canvas_.print("Z");' in source
+assert 'canvas_.print("HI!");' in source
+assert (ROOT / "tests/face_lifecycle_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
