@@ -166,7 +166,7 @@ void FaceAnimator::update(uint32_t nowMs) {
     render(clampFloat(openness, 0.04f, 1.0f));
 }
 
-void FaceAnimator::drawClosedEye(int centerX, int centerY, float openness) {
+void FaceAnimator::drawClosedEye(int centerX, int centerY) {
     // A slightly softened horizontal line works for a full blink and sleep.
     // It also avoids the old "tiny rectangular pupil" at low openness.
     const int stroke = sleeping_ ? 4 : 5;
@@ -177,7 +177,7 @@ void FaceAnimator::drawClosedEye(int centerX, int centerY, float openness) {
 
 void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft) {
     if (sleeping_ || openness < 0.14f) {
-        drawClosedEye(centerX, centerY, openness);
+        drawClosedEye(centerX, centerY);
         return;
     }
 
