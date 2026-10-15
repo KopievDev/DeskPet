@@ -107,7 +107,43 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     lastFrameMs_ = 0;
 }
 
-const char* FaceAnimator::quipForEmotion(Emotion emotion) {
+const char* FaceAnimator::quipForEmotion(Emotion emotion) const {
+    // The comic bubble remains opt-in in ALL profiles.
+    // Calm = reassuring, Playful = teasing, Cheeky = existing spicy
+    // censored dialogue. Reuse the same tiny Cyrillic glyph subset.
+    if (personality_ == Personality::Calm) {
+        switch (emotion) {
+            case Emotion::Happy:
+            case Emotion::Excited:
+            case Emotion::Love:
+                return u8"ВОТ ЭТО ДА!";
+            case Emotion::Furious:
+            case Emotion::Angry:
+            case Emotion::Sad:
+            case Emotion::Bored:
+                return u8"НУ И ЛАДНО";
+            case Emotion::Count: return nullptr;
+            default: return u8"ВСЕ ОК!";
+        }
+    }
+
+    if (personality_ == Personality::Playful) {
+        switch (emotion) {
+            case Emotion::Happy:
+            case Emotion::Excited:
+            case Emotion::Love:
+            case Emotion::Playful:
+                return u8"ХЕ-ХЕ, ПОПАЛ!";
+            case Emotion::Angry:
+            case Emotion::Furious:
+            case Emotion::Sad:
+            case Emotion::Bored:
+                return u8"ОЙ, БЛИН...";
+            case Emotion::Count: return nullptr;
+            default: return u8"ЧЕГО?!";
+        }
+    }
+
     // Short, deliberately censored Russian quips. Not emitted to Serial or
     // shown at all until a user explicitly enables sass mode.
     switch (emotion) {
@@ -131,6 +167,14 @@ const char* FaceAnimator::quipForEmotion(Emotion emotion) {
         case Emotion::Count: break;
     }
     return nullptr;
+}
+
+void FaceAnimator::setPersonality(Personality personality, uint32_t nowMs) {
+    personality_ = personality;
+    // Avoid leaving a bubble from the previous tone on screen.
+    quipVisible_ = false;
+    lastFrameMs_ = 0;
+    (void)nowMs;
 }
 
 void FaceAnimator::setSassEnabled(bool enabled, uint32_t nowMs) {
