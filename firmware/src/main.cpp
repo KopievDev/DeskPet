@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "DeskPetTDisplayS3.h"
@@ -339,7 +340,8 @@ void handleCommand(const char* command, uint32_t nowMs) {
         strncmp(command, "needs show ", 11) == 0) {
         const bool coffee = strcmp(command, "needs coffee") == 0;
         const bool play = strcmp(command, "needs play") == 0;
-        const char* preview = command + 11;
+        const char* preview = strncmp(command, "needs show ", 11) == 0
+            ? command + 11 : "";
         deskpet_needs::Cue cue = {Emotion::Neutral,
                                   deskpet_needs::Kind::None, 4800u};
         if (coffee || (strcmp(preview, "coffee") == 0 && !play)) {
