@@ -7,6 +7,7 @@
 #include "ReactionController.h"
 #include "IdleBehavior.h"
 #include "ButtonGesture.h"
+#include "PetBond.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -18,6 +19,7 @@ constexpr uint32_t kSurpriseDurationMs = 2300;
 DeskPetTDisplayS3 display;
 FaceAnimator face(display);
 ReactionController reactions;
+PetBond bond;
 IdleBehavior ambient;
 
 struct NamedEmotion {
@@ -44,6 +46,10 @@ constexpr NamedEmotion kEmotionCommands[] = {
     {"dizzy", Emotion::Dizzy},
     {"bored", Emotion::Bored},
     {"bewildered", Emotion::Bewildered},
+    {"nerd", Emotion::Nerd},
+    {"derp", Emotion::Derp},
+    {"gremlin", Emotion::Gremlin},
+    {"panic", Emotion::Panic},
 };
 static_assert(sizeof(kEmotionCommands) / sizeof(kEmotionCommands[0]) ==
                   static_cast<uint8_t>(Emotion::Count),
@@ -75,6 +81,9 @@ void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
     cancelAmbient(nowMs);
     demoEnabled = false;
+    if (action == deskpet_button::Action::Hold) bond.pet(nowMs);
+    else if (action == deskpet_button::Action::DoubleTap) bond.surprise(nowMs);
+    else bond.interact(nowMs);
 
     if (action == deskpet_button::Action::Tap) {
         reactions.nextEmotion(nowMs);
@@ -98,6 +107,9 @@ void handleBootGesture(deskpet_button::Action action, uint32_t nowMs) {
     cancelAmbient(nowMs);
     demoEnabled = false;
     reactions.activity(nowMs);
+    if (action == deskpet_button::Action::Hold || face.isSleeping()) {
+        bond.interact(nowMs);
+    }
 
     if (action == deskpet_button::Action::Tap) {
         if (face.isSleeping()) {
@@ -134,6 +146,11 @@ void showStatus() {
     Serial.print(reactions.idleSeconds());
     Serial.print("s) | demo: ");
     Serial.print(demoEnabled ? "on" : "off");
+    Serial.print(" | bond: ");
+    Serial.print(bond.score());
+    Serial.print("/100 (");
+    Serial.print(bond.enabled() ? "on" : "off");
+    Serial.print(")");
     Serial.print(" | sass: ");
     Serial.print(face.sassEnabled() ? "on" : "off");
     Serial.print(" | personality: ");
@@ -150,12 +167,13 @@ void showStatus() {
 
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered");
+        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
         Serial.println("Buttons: USER tap next; double-tap surprise; hold pet LOVE");
         Serial.println("Buttons: BOOT tap sleep/wake; hold cycle calm/playful/cheeky");
         Serial.println("Personality: personality calm | personality playful | personality cheeky");
-        Serial.println("Reactions: event build-success | event build-failure | idle on | idle off | idle <15..3600 seconds> | status");
+        Serial.println("Reactions: event build-success | event build-failure | idle on/off | idle <15..3600> | status");
+        Serial.println("Bond: bond on | bond off | bond reset | bond status (RAM only)");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -164,6 +182,25 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "status") == 0) {
         showStatus();
+        return;
+    }
+    if (strcmp(command, "bond status") == 0) {
+        Serial.print("Affection: ");
+        Serial.print(bond.score());
+        Serial.print("/100, comic cameos ");
+        Serial.println(bond.enabled() ? "ON" : "OFF");
+        return;
+    }
+    if (strcmp(command, "bond on") == 0 ||
+        strcmp(command, "bond off") == 0) {
+        bond.setEnabled(strcmp(command, "bond on") == 0, nowMs);
+        Serial.println(bond.enabled() ? "Bond cameos ON" : "Bond cameos OFF");
+        return;
+    }
+    if (strcmp(command, "bond reset") == 0) {
+        bond.reset(nowMs);
+        face.setAffection(bond.score());
+        Serial.println("Affection reset to 50/100");
         return;
     }
     if (strcmp(command, "ambient on") == 0 ||
@@ -186,6 +223,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         }
         cancelAmbient(nowMs);
         reactions.activity(nowMs);
+        bond.interact(nowMs);
         syncReaction(nowMs);
         ambient.setPersonality(next, nowMs);
         face.setPersonality(next, nowMs);
@@ -216,7 +254,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         if (face.isSleeping()) face.setSleeping(false, nowMs);
         syncReaction(nowMs);
         nextDemoMs = nowMs + kDemoIntervalMs;
-        Serial.println("Demo ON: cycling all 17 emotions");
+        Serial.println("Demo ON: cycling all 21 emotions");
         return;
     }
     if (strcmp(command, "demo off") == 0) {
@@ -277,6 +315,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         cancelAmbient(nowMs);
         demoEnabled = false;
         const bool success = strcmp(command, "event build-success") == 0;
+        bond.build(success, nowMs);
         reactions.buildResult(success, nowMs);
         syncReaction(nowMs);
         Serial.println(success ? "Build OK -> Excited (4.5s)" :
@@ -288,6 +327,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.nextEmotion(nowMs);
+        bond.interact(nowMs);
         if (face.isSleeping()) face.setSleeping(false, nowMs);
         syncReaction(nowMs);
         Serial.print("Mood: ");
@@ -299,6 +339,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
             cancelAmbient(nowMs);
             demoEnabled = false;
             reactions.chooseEmotion(item.emotion, nowMs);
+            bond.interact(nowMs);
             if (face.isSleeping()) face.setSleeping(false, nowMs);
             syncReaction(nowMs);
             Serial.print("Mood: ");
@@ -347,6 +388,8 @@ void setup() {
     }
     const uint32_t startedAt = millis();
     reactions.begin(startedAt);
+    bond.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0x682C95B3u);
+    face.setAffection(bond.score());
     ambient.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0xB16B00B5u);
     Serial.println("DeskPet 0.1 ready. Type help.");
 }
@@ -372,7 +415,16 @@ void loop() {
         !reactions.reactionActive() && !reactions.idleActive() &&
         reactions.desiredEmotion() == Emotion::Neutral &&
         reactions.manualEmotion() == Emotion::Neutral;
-    if (ambient.tick(now, allowAmbient)) {
+
+    Emotion comic = Emotion::Neutral;
+    if (bond.tick(now, !face.isSleeping(), allowAmbient,
+                  ambient.personality(), comic)) {
+        cancelAmbient(now);
+        reactions.showTemporary(comic, now, PetBond::kComicDurationMs);
+        syncReaction(now);
+    }
+    face.setAffection(bond.score());
+    if (ambient.tick(now, allowAmbient && !reactions.reactionActive())) {
         face.setIdleGesture(ambient.gesture(), ambient.startedMs());
     }
 
