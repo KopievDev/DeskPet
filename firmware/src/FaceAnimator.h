@@ -5,6 +5,7 @@
 
 #include "Emotion.h"
 #include "IdleBehavior.h"
+#include "Personality.h"
 
 const char* emotionName(Emotion emotion);
 
@@ -26,6 +27,8 @@ public:
     void setSassEnabled(bool enabled, uint32_t nowMs);
     bool sassEnabled() const { return sassEnabled_; }
     bool showQuip(uint32_t nowMs);
+    void setPersonality(Personality personality, uint32_t nowMs);
+    Personality personality() const { return personality_; }
 
     // Ambient gestures are visual-only: never replace the user's emotion.
     void setIdleGesture(IdleGesture gesture, uint32_t startedMs);
@@ -41,7 +44,7 @@ private:
     void drawQuip();
     void drawIdleDetails(int eyeY);
     float idleEnvelope() const;
-    static const char* quipForEmotion(Emotion emotion);
+    const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
     static float smoothStep(float t);
     static bool deadlineReached(uint32_t nowMs, uint32_t deadlineMs);
@@ -92,6 +95,7 @@ private:
     bool ready_ = false;
     IdleGesture idleGesture_ = IdleGesture::None;
     uint32_t idleStartedMs_ = 0;
+    Personality personality_ = Personality::Calm;
     bool sassEnabled_ = false;
     bool quipVisible_ = false;
     uint32_t quipStartedMs_ = 0;
