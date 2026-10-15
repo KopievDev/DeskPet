@@ -58,8 +58,8 @@ int main() {
     for (uint32_t i = 0; i < 200u; ++i) {
         const Cue cue = story.record(false, 2000000u + i * 250u);
         if (i == 0u) expect(cue, Emotion::Panic, 4800u);
-        else assert(cue.emotion == Emotion::Gremlin ||
-                    cue.emotion == Emotion::Furious);
+        else if (i % 2u != 0u) expect(cue, Emotion::Gremlin, 4800u);
+        else expect(cue, Emotion::Furious, 4500u);
         assert(story.consecutiveFailures() <= 99u);
     }
     assert(story.consecutiveFailures() == 99u);
