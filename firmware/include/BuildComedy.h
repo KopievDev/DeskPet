@@ -28,6 +28,7 @@ public:
         failures_ = 0u;
         lastFailureMs_ = 0u;
         hadFailure_ = false;
+        nextFurious_ = true;
     }
 
     uint8_t consecutiveFailures() const { return failures_; }
@@ -42,16 +43,21 @@ public:
                             : Cue{Emotion::Excited, kExcitedDurationMs};
         }
 
-        if (!isRecent(nowMs)) failures_ = 0u;
+        if (!isRecent(nowMs)) {
+            failures_ = 0u;
+            nextFurious_ = true;
+        }
         if (failures_ < 99u) ++failures_;
         lastFailureMs_ = nowMs;
         hadFailure_ = true;
 
         if (failures_ == 1u) return {Emotion::Panic, kComicDurationMs};
-        if (failures_ % 2u == 0u) {
-            return {Emotion::Gremlin, kComicDurationMs};
-        }
-        return {Emotion::Furious, kFuriousDurationMs};
+        if (failures_ == 2u) return {Emotion::Gremlin, kComicDurationMs};
+        // Alternate even after the visible counter saturates at 99.
+        const bool furious = nextFurious_;
+        nextFurious_ = !nextFurious_;
+        return furious ? Cue{Emotion::Furious, kFuriousDurationMs}
+                       : Cue{Emotion::Gremlin, kComicDurationMs};
     }
 
 private:
@@ -64,6 +70,7 @@ private:
     uint32_t lastFailureMs_ = 0u;
     uint8_t failures_ = 0u;
     bool hadFailure_ = false;
+    bool nextFurious_ = true;
 };
 
 } // namespace deskpet_build_comedy
