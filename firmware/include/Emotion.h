@@ -22,5 +22,9 @@ enum class Emotion : uint8_t {
     Dizzy,
     Bored,
     Bewildered,
+    Nerd,
+    Derp,
+    Gremlin,
+    Panic,
     Count
 };
