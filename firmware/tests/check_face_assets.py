@@ -337,5 +337,50 @@ assert "event user-active" in helper
 assert "--simulate" in helper
 assert (ROOT.parent / "scripts/test_deskpet_activity.py").is_file()
 
+needs = (ROOT / "include/PetNeeds.h").read_text(encoding="utf-8")
+assert "namespace deskpet_needs" in needs
+assert "enum class Kind : uint8_t" in needs
+assert "class Controller" in needs
+assert "kEnergyAwakeMs = 240000u" in needs
+assert "kEnergySleepMs = 60000u" in needs
+assert "kAttentionMs = 240000u" in needs
+assert "kMoodMs = 540000u" in needs
+assert "kCueIntervalMs = 90000u" in needs
+assert "void advance(uint32_t nowMs, bool sleeping)" in needs
+assert "if (sleeping != lastSleeping_)" in needs
+assert "uint8_t energy() const" in needs
+assert "uint8_t mood() const" in needs
+assert "uint8_t attention() const" in needs
+assert "void pet()" in needs and "void coffee()" in needs
+assert "void play()" in needs and "void build(bool success)" in needs
+assert "bool tick(uint32_t nowMs, bool eligible, Personality personality," in needs
+assert "Emotion::Nerd, Kind::Coffee" in needs
+assert "Kind::Attention" in needs and "Kind::Cheer" in needs
+assert '#include "PetNeeds.h"' in serial
+assert "deskpet_needs::Controller needs;" in serial
+assert "needs.begin(startedAt);" in serial
+assert "needs.advance(now, face.isSleeping());" in serial
+assert "needs.pet();" in serial
+assert "needs.interact();" in serial
+assert "needs.surprise();" in serial
+assert "needs.build(success);" in serial
+assert "needs.tick(now, allowNeeds, ambient.personality(), needsCue)" in serial
+assert "reactions.showTemporary(needsCue.emotion, now, needsCue.durationMs)" in serial
+assert "face.setNeedPrompt(needsCue.kind);" in serial
+assert "face.setNeeds(needs.energy(), needs.mood(), needs.attention());" in serial
+for command in ("needs status", "needs reset", "needs on", "needs off",
+                "needs coffee", "needs play", "needs set ",
+                "needs show "):
+    assert command in serial, f"Missing needs command: {command}"
+assert "void FaceAnimator::drawNeedPrompt(int eyeY, float openness)" in source
+assert "drawNeedPrompt(eyeY, openness);" in source
+assert "canvas_.drawRoundRect(x, y, 17, 13, 3, kCup);" in source
+assert "needPrompt_ == deskpet_needs::Kind::None" in source
+assert "canvas_.print(energy_);" in source
+assert "canvas_.print(mood_);" in source
+assert "canvas_.print(attention_);" in source
+assert "void setNeedPrompt(deskpet_needs::Kind prompt)" in face_header
+assert (ROOT / "tests/pet_needs_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
