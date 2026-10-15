@@ -15,6 +15,11 @@ enum class Emotion : uint8_t {
     Confused,
     Excited,
     Playful,
+    Smug,
+    Furious,
+    Embarrassed,
+    Dizzy,
+    Bored,
     Count
 };
 
@@ -34,6 +39,11 @@ public:
     void setSleeping(bool sleeping, uint32_t nowMs);
     bool isSleeping() const { return sleeping_; }
 
+    // Comic quips are opt-in and never persisted by the firmware.
+    void setSassEnabled(bool enabled, uint32_t nowMs);
+    bool sassEnabled() const { return sassEnabled_; }
+    bool showQuip(uint32_t nowMs);
+
 private:
     void render(float openness);
     void drawEye(int centerX, int centerY, float openness, bool isLeft);
@@ -42,6 +52,8 @@ private:
     void animateBrows();
     void animateEyes();
     void updateTransition(uint32_t nowMs);
+    void drawQuip();
+    static const char* quipForEmotion(Emotion emotion);
     static bool hasSpecialEyeShape(Emotion emotion);
     static float smoothStep(float t);
     static bool deadlineReached(uint32_t nowMs, uint32_t deadlineMs);
@@ -90,4 +102,7 @@ private:
     bool blinking_ = false;
     bool sleeping_ = false;
     bool ready_ = false;
+    bool sassEnabled_ = false;
+    bool quipVisible_ = false;
+    uint32_t quipStartedMs_ = 0;
 };
