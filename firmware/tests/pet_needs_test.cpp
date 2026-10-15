@@ -91,9 +91,9 @@ int main() {
     assert(needs.attention() == 50u && needs.mood() == 50u);
     needs.advance(1500001u, false);
     assert(needs.energy() == 21u);
-    needs.advance(1740000u, false);
+    needs.advance(1739999u, false);
     assert(needs.energy() == 21u);
-    needs.advance(1740001u, false);
+    needs.advance(1740000u, false);
     assert(needs.energy() == 20u);
 
     // Disabled needs freeze, yet re-enable without catching up from sleep.
