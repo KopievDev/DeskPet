@@ -9,6 +9,7 @@
 #include "ButtonGesture.h"
 #include "PetBond.h"
 #include "BuildComedy.h"
+#include "UserActivity.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -22,6 +23,7 @@ FaceAnimator face(display);
 ReactionController reactions;
 PetBond bond;
 deskpet_build_comedy::Story buildStory;
+deskpet_activity::Controller userActivity;
 IdleBehavior ambient;
 
 struct NamedEmotion {
@@ -153,6 +155,9 @@ void showStatus() {
     Serial.print("/100 (");
     Serial.print(bond.enabled() ? "on" : "off");
     Serial.print(")");
+    Serial.print(" | computer: ");
+    Serial.print(deskpet_activity::presenceName(userActivity.presence()));
+    Serial.print(userActivity.enabled() ? "" : " (off)");
     Serial.print(" | build failures: ");
     Serial.print(buildStory.consecutiveFailures());
     Serial.print(" | sass: ");
@@ -180,6 +185,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Reactions: event build-success | event build-failure | idle on/off | idle <15..3600> | status");
         Serial.println("Bond: bond on | bond off | bond reset | bond status (RAM only)");
         Serial.println("Build comedy: build status | build reset | event build-success/failure");
+        Serial.println("Mac activity: event user-idle | event user-active | activity on/off/status");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -230,6 +236,40 @@ void handleCommand(const char* command, uint32_t nowMs) {
         bond.reset(nowMs);
         face.setAffection(bond.score());
         Serial.println("Affection reset to 50/100");
+        return;
+    }
+    if (strcmp(command, "activity status") == 0) {
+        Serial.print("Computer activity: ");
+        Serial.print(deskpet_activity::presenceName(userActivity.presence()));
+        Serial.print(" | monitoring: ");
+        Serial.print(userActivity.enabled() ? "ON" : "OFF");
+        Serial.print(" | idle jokes: ");
+        Serial.println(userActivity.jokeCount());
+        return;
+    }
+    if (strcmp(command, "activity on") == 0 ||
+        strcmp(command, "activity off") == 0) {
+        const bool enabled = strcmp(command, "activity on") == 0;
+        userActivity.setEnabled(enabled, nowMs);
+        Serial.println(enabled ? "Host activity jokes ON" :
+                                 "Host activity jokes OFF");
+        return;
+    }
+    if (strcmp(command, "event user-idle") == 0 ||
+        strcmp(command, "event user-active") == 0) {
+        if (strcmp(command, "event user-idle") == 0) {
+            userActivity.idle(nowMs);
+        } else {
+            userActivity.active(nowMs);
+            // An actual return from the Mac can clear a stale internal
+            // Bored state, but may not cancel a temporary build reaction.
+            if (reactions.idleActive()) {
+                reactions.activity(nowMs);
+                syncReaction(nowMs);
+            }
+        }
+        Serial.print("Computer: ");
+        Serial.println(deskpet_activity::presenceName(userActivity.presence()));
         return;
     }
     if (strcmp(command, "build status") == 0) {
@@ -439,6 +479,7 @@ void setup() {
     const uint32_t startedAt = millis();
     reactions.begin(startedAt);
     buildStory.begin();
+    userActivity.begin(startedAt);
     bond.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0x682C95B3u);
     face.setAffection(bond.score());
     ambient.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0xB16B00B5u);
@@ -467,15 +508,33 @@ void loop() {
         reactions.desiredEmotion() == Emotion::Neutral &&
         reactions.manualEmotion() == Emotion::Neutral;
 
+    // Host-driven comedy has precedence over random PetBond cameos.
+    // If the Mac has reported AWAY, PetBond cannot randomly interrupt
+    // a carefully-timed activity skit.
+    const bool allowActivity = allowAmbient;
+    deskpet_activity::Cue activityCue = {Emotion::Neutral, 0u};
+    if (userActivity.tick(now, allowActivity, ambient.personality(),
+                          bond.score(), activityCue)) {
+        cancelAmbient(now);
+        reactions.showTemporary(activityCue.emotion, now,
+                                activityCue.durationMs);
+        syncReaction(now);
+    }
+
     Emotion comic = Emotion::Neutral;
-    if (bond.tick(now, !face.isSleeping(), allowAmbient,
+    const bool allowBond = allowAmbient &&
+        !reactions.reactionActive() &&
+        userActivity.presence() != deskpet_activity::Presence::Away;
+    if (bond.tick(now, !face.isSleeping(), allowBond,
                   ambient.personality(), comic)) {
         cancelAmbient(now);
         reactions.showTemporary(comic, now, PetBond::kComicDurationMs);
         syncReaction(now);
     }
     face.setAffection(bond.score());
-    if (ambient.tick(now, allowAmbient && !reactions.reactionActive())) {
+    if (ambient.tick(now, allowAmbient && !reactions.reactionActive() &&
+                     userActivity.presence() !=
+                         deskpet_activity::Presence::Away)) {
         face.setIdleGesture(ambient.gesture(), ambient.startedMs());
     }
 
