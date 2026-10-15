@@ -6,46 +6,19 @@
 #include "FaceAnimator.h"
 #include "ReactionController.h"
 #include "IdleBehavior.h"
+#include "ButtonGesture.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
 constexpr uint8_t kBootButtonPin = 0;
-constexpr uint32_t kDebounceMs = 35;
 constexpr uint32_t kDemoIntervalMs = 1800;
+constexpr uint32_t kPetDurationMs = 3200;
+constexpr uint32_t kSurpriseDurationMs = 2300;
 
 DeskPetTDisplayS3 display;
 FaceAnimator face(display);
 ReactionController reactions;
 IdleBehavior ambient;
-
-struct Button {
-    explicit Button(uint8_t gpio) : pin(gpio) {}
-
-    void begin() {
-        pinMode(pin, INPUT_PULLUP);
-        lastRaw = digitalRead(pin);
-        stable = lastRaw;
-        changedAt = millis();
-    }
-
-    bool pressed(uint32_t nowMs) {
-        const bool raw = digitalRead(pin);
-        if (raw != lastRaw) {
-            lastRaw = raw;
-            changedAt = nowMs;
-        }
-        if (nowMs - changedAt >= kDebounceMs && stable != raw) {
-            stable = raw;
-            return !stable;
-        }
-        return false;
-    }
-
-    uint8_t pin;
-    bool lastRaw = HIGH;
-    bool stable = HIGH;
-    uint32_t changedAt = 0;
-};
 
 struct NamedEmotion {
     const char* command;
@@ -76,8 +49,8 @@ static_assert(sizeof(kEmotionCommands) / sizeof(kEmotionCommands[0]) ==
                   static_cast<uint8_t>(Emotion::Count),
               "Each emotion needs a Serial command");
 
-Button userButton(kUserButtonPin);
-Button bootButton(kBootButtonPin);
+deskpet_button::Gesture userButton(true);
+deskpet_button::Gesture bootButton(false);
 char commandBuffer[48] = {};
 size_t commandLength = 0;
 bool demoEnabled = false;
@@ -95,6 +68,59 @@ void syncReaction(uint32_t nowMs) {
     if (reactions.takeChange(next)) {
         cancelAmbient(nowMs);
         face.setEmotion(next, nowMs);
+    }
+}
+
+void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
+    if (action == deskpet_button::Action::None) return;
+    cancelAmbient(nowMs);
+    demoEnabled = false;
+
+    if (action == deskpet_button::Action::Tap) {
+        reactions.nextEmotion(nowMs);
+        Serial.println("USER tap -> next emotion");
+    } else if (action == deskpet_button::Action::DoubleTap) {
+        // Brief surprise, then restore the previous manual mood.
+        reactions.showTemporary(Emotion::Surprised, nowMs, kSurpriseDurationMs);
+        Serial.println("USER double -> SURPRISED (2.3s)");
+    } else if (action == deskpet_button::Action::Hold) {
+        // Love eyes + tiny hearts are the visual petting response.
+        reactions.showTemporary(Emotion::Love, nowMs, kPetDurationMs);
+        Serial.println("USER hold -> PET / LOVE (3.2s)");
+    }
+
+    if (face.isSleeping()) face.setSleeping(false, nowMs);
+    syncReaction(nowMs);
+}
+
+void handleBootGesture(deskpet_button::Action action, uint32_t nowMs) {
+    if (action == deskpet_button::Action::None) return;
+    cancelAmbient(nowMs);
+    demoEnabled = false;
+    reactions.activity(nowMs);
+
+    if (action == deskpet_button::Action::Tap) {
+        if (face.isSleeping()) {
+            face.setSleeping(false, nowMs);
+            syncReaction(nowMs);
+            Serial.println("BOOT tap -> wake");
+        } else {
+            syncReaction(nowMs); // restore baseline before going to sleep
+            face.setSleeping(true, nowMs);
+            Serial.println("BOOT tap -> sleep");
+        }
+    } else if (action == deskpet_button::Action::Hold) {
+        // Cycle personality without changing sleep state or enabling sass.
+        const auto current = ambient.personality();
+        const Personality next = current == Personality::Calm
+            ? Personality::Playful
+            : current == Personality::Playful
+                ? Personality::Cheeky : Personality::Calm;
+        syncReaction(nowMs);
+        ambient.setPersonality(next, nowMs);
+        face.setPersonality(next, nowMs);
+        Serial.print("BOOT hold -> personality ");
+        Serial.println(personalityName(next));
     }
 }
 
@@ -126,6 +152,8 @@ void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
+        Serial.println("Buttons: USER tap next; double-tap surprise; hold pet LOVE");
+        Serial.println("Buttons: BOOT tap sleep/wake; hold cycle calm/playful/cheeky");
         Serial.println("Personality: personality calm | personality playful | personality cheeky");
         Serial.println("Reactions: event build-success | event build-failure | idle on | idle off | idle <15..3600 seconds> | status");
         return;
@@ -303,8 +331,11 @@ void readSerial(uint32_t nowMs) {
 
 void setup() {
     Serial.begin(115200);
-    userButton.begin();
-    bootButton.begin();
+    pinMode(kUserButtonPin, INPUT_PULLUP);
+    pinMode(kBootButtonPin, INPUT_PULLUP);
+    const uint32_t buttonsStartedAt = millis();
+    userButton.begin(digitalRead(kUserButtonPin) == LOW, buttonsStartedAt);
+    bootButton.begin(digitalRead(kBootButtonPin) == LOW, buttonsStartedAt);
 
     if (!display.begin(1, 200)) {
         Serial.println("LCD initialization failed");
@@ -322,24 +353,10 @@ void setup() {
 
 void loop() {
     const uint32_t now = millis();
-    if (userButton.pressed(now)) {
-        cancelAmbient(now);
-        demoEnabled = false;
-        reactions.nextEmotion(now);
-        syncReaction(now);
-    }
-    if (bootButton.pressed(now)) {
-        cancelAmbient(now);
-        demoEnabled = false;
-        reactions.activity(now);
-        if (face.isSleeping()) {
-            face.setSleeping(false, now);
-            syncReaction(now);
-        } else {
-            syncReaction(now);
-            face.setSleeping(true, now);
-        }
-    }
+    handleUserGesture(
+        userButton.poll(digitalRead(kUserButtonPin) == LOW, now), now);
+    handleBootGesture(
+        bootButton.poll(digitalRead(kBootButtonPin) == LOW, now), now);
 
     readSerial(now);
     if (demoEnabled && static_cast<int32_t>(now - nextDemoMs) >= 0) {
