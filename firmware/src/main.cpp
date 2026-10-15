@@ -7,6 +7,7 @@ namespace {
 constexpr uint8_t kUserButtonPin = 14;
 constexpr uint8_t kBootButtonPin = 0;
 constexpr uint32_t kDebounceMs = 35;
+constexpr uint32_t kDemoIntervalMs = 1800;
 
 DeskPetTDisplayS3 display;
 FaceAnimator face(display);
@@ -46,12 +47,24 @@ Button bootButton(kBootButtonPin);
 
 char commandBuffer[40] = {};
 size_t commandLength = 0;
+bool demoEnabled = false;
+uint32_t nextDemoMs = 0;
 
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Commands: neutral happy curious surprised sleepy angry sad love confused excited playful sleep wake next ping help");
+        Serial.println("Commands: neutral happy curious surprised sleepy angry sad love confused excited playful sleep wake next demo on demo off ping help");
     } else if (strcmp(command, "ping") == 0) {
         Serial.println("pong");
+    } else if (strcmp(command, "demo on") == 0) {
+        demoEnabled = true;
+        face.setEmotion(Emotion::Neutral, nowMs);
+        nextDemoMs = nowMs + kDemoIntervalMs;
+        Serial.println("Demo ON: cycling all 11 emotions.");
+        return;
+    } else if (strcmp(command, "demo off") == 0) {
+        demoEnabled = false;
+        Serial.println("Demo OFF.");
+        return;
     } else if (strcmp(command, "sleep") == 0) {
         face.setSleeping(true, nowMs);
     } else if (strcmp(command, "wake") == 0) {
@@ -86,6 +99,8 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (*command && strcmp(command, "help") != 0 && strcmp(command, "ping") != 0) {
+        // Manual emotion / sleep / wake commands take precedence over the demo.
+        demoEnabled = false;
         Serial.print("State: ");
         Serial.println(face.isSleeping() ? "sleeping" : "awake");
     }
@@ -129,9 +144,19 @@ void setup() {
 
 void loop() {
     const uint32_t now = millis();
-    if (userButton.pressed(now)) face.nextEmotion(now);
-    if (bootButton.pressed(now)) face.setSleeping(!face.isSleeping(), now);
+    if (userButton.pressed(now)) {
+        demoEnabled = false;
+        face.nextEmotion(now);
+    }
+    if (bootButton.pressed(now)) {
+        demoEnabled = false;
+        face.setSleeping(!face.isSleeping(), now);
+    }
     readSerial(now);
+    if (demoEnabled && static_cast<int32_t>(now - nextDemoMs) >= 0) {
+        face.nextEmotion(now);
+        nextDemoMs = now + kDemoIntervalMs;
+    }
     face.update(now);
     delay(1);
 }
