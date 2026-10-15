@@ -88,7 +88,8 @@ int main() {
     reactions.buildResult(false, 4200);
     checkMood(reactions, Emotion::Furious);
     reactions.nextEmotion(4300);
-    checkMood(reactions, Emotion::Furious); // Smug + 1 = Furious
+    assert(reactions.manualEmotion() == Emotion::Furious);
+    assert(!reactions.takeChange(unused)); // already showing Furious; no redraw
     assert(!reactions.reactionActive());
     reactions.nextEmotion(4400);
     checkMood(reactions, Emotion::Embarrassed);
