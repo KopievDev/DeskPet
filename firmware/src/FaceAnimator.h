@@ -40,6 +40,10 @@ private:
     void drawBrow(int centerX, uint8_t index, uint16_t color);
     void drawClosedEye(int centerX, int centerY);
     void animateBrows();
+    void animateEyes();
+    void updateTransition(uint32_t nowMs);
+    static bool hasSpecialEyeShape(Emotion emotion);
+    static float smoothStep(float t);
     static bool deadlineReached(uint32_t nowMs, uint32_t deadlineMs);
 
     struct BrowState {
@@ -48,11 +52,25 @@ private:
         float arch = 4.0f;
     };
 
+    struct EyePose {
+        float width = 72.0f;
+        float height = 74.0f;
+        float openness = 1.0f;
+        float pupilRadius = 15.0f;
+        float lidLeft = 0.0f;
+        float lidRight = 0.0f;
+    };
+
+    static EyePose targetEyePose(Emotion emotion, bool isLeft);
+
     BrowState brows_[2]; // independent, smoothly animated left/right eyebrows
+    EyePose eyes_[2];    // interpolated dimensions, eyelids and pupil sizes
 
     lgfx::LGFX_Device& display_;
     lgfx::LGFX_Sprite canvas_;
     Emotion emotion_ = Emotion::Neutral;
+    Emotion visualEmotion_ = Emotion::Neutral;
+    Emotion transitionFrom_ = Emotion::Neutral;
 
     int16_t width_ = 320;
     int16_t height_ = 170;
@@ -61,6 +79,10 @@ private:
     uint32_t blinkStartedMs_ = 0;
     uint32_t nextLookMs_ = 0;
     uint32_t emotionStartedMs_ = 0;
+    uint32_t transitionStartedMs_ = 0;
+    float transitionOpenness_ = 1.0f;
+    bool transitionActive_ = false;
+    bool transitionRevealed_ = false;
     uint32_t animationNowMs_ = 0;
     float gazeX_ = 0.0f;
     float targetGazeX_ = 0.0f;
