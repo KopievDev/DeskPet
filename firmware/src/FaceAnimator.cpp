@@ -1,6 +1,7 @@
 #include "FaceAnimator.h"
 #include "ComicFont.h"
 #include "HeartShape.h"
+#include "MoodPalette.h"
 
 #include <math.h>
 
@@ -399,6 +400,19 @@ void FaceAnimator::animateEyes() {
     }
 }
 
+void FaceAnimator::animateMoodColors() {
+    // A ~0.5-second RGB565 colour transition follows the rendered mood.
+    // Neither sprite allocation nor blocking delays are required.
+    const float angryTarget =
+        !sleeping_ && visualEmotion_ == Emotion::Angry ? 1.0f : 0.0f;
+    const float furiousTarget =
+        !sleeping_ && visualEmotion_ == Emotion::Furious ? 1.0f : 0.0f;
+    angerTint_ += (angryTarget - angerTint_) * 0.19f;
+    furyTint_ += (furiousTarget - furyTint_) * 0.19f;
+    if (angerTint_ < 0.002f) angerTint_ = 0.0f;
+    if (furyTint_ < 0.002f) furyTint_ = 0.0f;
+}
+
 void FaceAnimator::animateBrows() {
     // Target poses are tuned for the 320x170 LCD: eyebrows remain above
     // even the tallest eye, and asymmetry makes CURIOUS visibly different.
@@ -570,6 +584,7 @@ void FaceAnimator::update(uint32_t nowMs) {
         : (1.0f - blink * 0.94f) * transitionOpenness_;
     animateBrows();
     animateEyes();
+    animateMoodColors();
     render(clampFloat(openness, 0.04f, 1.0f));
 }
 
@@ -579,7 +594,7 @@ void FaceAnimator::drawClosedEye(int centerX, int centerY) {
     const int stroke = sleeping_ ? 4 : 5;
     const int y = sleeping_ ? centerY + 5 : centerY;
     canvas_.fillRoundRect(centerX - 31, y - stroke / 2,
-                          62, stroke, stroke / 2, kEye);
+                          62, stroke, stroke / 2, eyeFill_);
 }
 
 void FaceAnimator::drawHeartEye(int centerX, int centerY, float openness) {
@@ -682,7 +697,7 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const int top = centerY - visibleH / 2 + bounce;
     const int radius = visibleH / 2 < eyeW / 2 ? visibleH / 2 : eyeW / 2;
 
-    canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, kEye);
+    canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, eyeFill_);
 
     // Shrink pupils as Sleepy closes its eyelids; clip their radius
     // to the available eye height to prevent dark circles spilling out.
@@ -745,12 +760,12 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         const int pupilX = centerX + lookOffset;
         const int pupilY = centerY + bounce +
                            ((curious || sad) ? -2 : (embarrassed ? 8 : 3));
-        canvas_.fillCircle(pupilX, pupilY, pupilRadius, kPupil);
+        canvas_.fillCircle(pupilX, pupilY, pupilRadius, pupilFill_);
         if (pupilRadius >= 8) {
-            canvas_.fillCircle(pupilX - 5, pupilY - 6, surprised ? 6 : 4, kEye);
+            canvas_.fillCircle(pupilX - 5, pupilY - 6, surprised ? 6 : 4, eyeFill_);
         }
         if (excited) {
-            canvas_.fillCircle(pupilX + 7, pupilY + 8, 2, kEye);
+            canvas_.fillCircle(pupilX + 7, pupilY + 8, 2, eyeFill_);
         }
     }
 
@@ -854,15 +869,25 @@ void FaceAnimator::drawIdleDetails(int eyeY) {
 void FaceAnimator::render(float openness) {
     canvas_.fillScreen(kBackground);
 
+    const bool expressive = visualEmotion_ != Emotion::Neutral &&
+                            visualEmotion_ != Emotion::Sleepy && !sleeping_;
+    const uint16_t baseBrow = expressive ? kAccent : kMuted;
+    const uint8_t angryStrength =
+        static_cast<uint8_t>(clampFloat(angerTint_, 0.0f, 1.0f) * 255.0f);
+    const uint8_t furiousStrength =
+        static_cast<uint8_t>(clampFloat(furyTint_, 0.0f, 1.0f) * 255.0f);
+    const deskpet_mood::Colors palette =
+        deskpet_mood::colors(angryStrength, furiousStrength, baseBrow);
+    eyeFill_ = palette.eye;
+    pupilFill_ = palette.pupil;
+
     const int eyeY = height_ / 2 + 10;
     const int leftEyeX = width_ / 2 - 62;
     const int rightEyeX = width_ / 2 + 62;
     drawEye(leftEyeX, eyeY, openness, true);
     drawEye(rightEyeX, eyeY, openness, false);
 
-    const bool expressive = visualEmotion_ != Emotion::Neutral &&
-                            visualEmotion_ != Emotion::Sleepy && !sleeping_;
-    const uint16_t browColor = expressive ? kAccent : kMuted;
+    const uint16_t browColor = palette.brow;
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
     drawIdleDetails(eyeY);
@@ -904,12 +929,27 @@ void FaceAnimator::render(float openness) {
                                        eyeY + 12 + (dot % 2) * 3, 2, kAccent);
                 }
             }
+        } else if (visualEmotion_ == Emotion::Angry) {
+            // Small amber stress marks, so Angry reads as irritated rather
+            // than the more intense red Furious state.
+            for (int side = -1; side <= 1; side += 2) {
+                const int x = width_ / 2 + side * 112;
+                canvas_.drawLine(x - 5, eyeY - 8, x - 2, eyeY - 14,
+                                 deskpet_mood::kAngryBrow);
+                canvas_.drawLine(x + 2, eyeY - 8, x + 5, eyeY - 14,
+                                 deskpet_mood::kAngryBrow);
+            }
         } else if (visualEmotion_ == Emotion::Furious) {
-            // Lightning bursts outside the eye silhouette.
+            // Vivid red lightning with golden flicker at the outer corners.
+            // Alternating the inner stroke keeps it lively without changing
+            // the global screen background or the other emotions' palettes.
+            const uint16_t sparks = (animationNowMs_ / 160u) % 2u == 0u
+                ? deskpet_mood::kFuriousSpark : deskpet_mood::kFuriousBrow;
             for (int side = -1; side <= 1; side += 2) {
                 const int x = width_ / 2 + side * 111;
-                canvas_.drawLine(x - 2, eyeY - 22, x + 4, eyeY - 15, kAccent);
-                canvas_.drawLine(x + 4, eyeY - 15, x - 3, eyeY - 9, kAccent);
+                canvas_.drawLine(x - 4, eyeY - 23, x + 4, eyeY - 15,
+                                 deskpet_mood::kFuriousBrow);
+                canvas_.drawLine(x + 4, eyeY - 15, x - 3, eyeY - 8, sparks);
             }
         } else if (visualEmotion_ == Emotion::Smug) {
             // Crooked little smirk in the gap between the eyes.
