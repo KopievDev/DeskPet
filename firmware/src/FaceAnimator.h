@@ -81,6 +81,7 @@ private:
     uint32_t emotionStartedMs_ = 0;
     uint32_t transitionStartedMs_ = 0;
     float transitionOpenness_ = 1.0f;
+    float transitionStartOpenness_ = 1.0f;
     bool transitionActive_ = false;
     bool transitionRevealed_ = false;
     uint32_t animationNowMs_ = 0;
