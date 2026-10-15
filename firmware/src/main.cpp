@@ -68,6 +68,7 @@ constexpr NamedEmotion kEmotionCommands[] = {
     {"embarrassed", Emotion::Embarrassed},
     {"dizzy", Emotion::Dizzy},
     {"bored", Emotion::Bored},
+    {"bewildered", Emotion::Bewildered},
 };
 static_assert(sizeof(kEmotionCommands) / sizeof(kEmotionCommands[0]) ==
                   static_cast<uint8_t>(Emotion::Count),
@@ -107,7 +108,7 @@ void showStatus() {
 
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored");
+        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip");
         Serial.println("Reactions: event build-success | event build-failure | idle on | idle off | idle <15..3600 seconds> | status");
         return;
@@ -139,7 +140,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         if (face.isSleeping()) face.setSleeping(false, nowMs);
         syncReaction(nowMs);
         nextDemoMs = nowMs + kDemoIntervalMs;
-        Serial.println("Demo ON: cycling all 16 emotions");
+        Serial.println("Demo ON: cycling all 17 emotions");
         return;
     }
     if (strcmp(command, "demo off") == 0) {
