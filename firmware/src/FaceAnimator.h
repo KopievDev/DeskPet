@@ -23,6 +23,9 @@ public:
     void nextEmotion(uint32_t nowMs);
     void setSleeping(bool sleeping, uint32_t nowMs);
     bool isSleeping() const { return lifecycle_.sleeping(); }
+    const char* lifecycleName() const {
+        return deskpet_lifecycle::phaseName(lifecycle_.phase());
+    }
 
     // Comic quips are opt-in and never persisted by the firmware.
     void setSassEnabled(bool enabled, uint32_t nowMs);
