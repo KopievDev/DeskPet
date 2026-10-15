@@ -10,23 +10,41 @@
 
 ## Прошивка через терминал (macOS)
 
-Установить PlatformIO CLI, например командой `python3 -m pip install --user platformio` (и добавить каталог пользовательских Python-скриптов в PATH, если потребуется).
+Для macOS с Homebrew рекомендуем **PlatformIO CLI через Homebrew**. Не используйте `pip install --user` с Homebrew Python: в современных версиях он может завершиться `externally-managed-environment` (PEP 668).
+
+```bash
+brew install platformio
+pio --version
+```
+
+Клонировать ветку первого прототипа и собрать:
 
 ```bash
 git clone https://github.com/KopievDev/DeskPet.git
 cd DeskPet
-python3 -m platformio run -d firmware -e tdisplay_s3
+git switch feat/firmware-animated-face
+pio run -d firmware -e tdisplay_s3
 ```
 
-Подключить плату USB-C, затем:
+Если репозиторий уже клонирован, достаточно начать с `cd DeskPet` (если вы не в нём) и `pio run -d firmware -e tdisplay_s3`.
+
+Подключить плату USB-C (кабель для передачи данных), затем:
 
 ```bash
-python3 -m platformio device list
-python3 -m platformio run -d firmware -e tdisplay_s3 -t upload
-python3 -m platformio device monitor -b 115200
+pio device list
+pio run -d firmware -e tdisplay_s3 -t upload
+pio device monitor -d firmware -b 115200
 ```
 
 При нескольких портах добавить `--upload-port /dev/cu.usbmodemXXXX` для `run`, а в monitor — `-p /dev/cu.usbmodemXXXX`. Если загрузка не начинается: удерживать BOOT, кратко нажать RST, отпустить BOOT и повторить upload.
+
+**Если Homebrew недоступен**, можно установить PlatformIO в отдельное Python-окружение:
+
+```bash
+python3 -m venv ~/.venvs/platformio
+~/.venvs/platformio/bin/python -m pip install -U platformio
+~/.venvs/platformio/bin/pio run -d firmware -e tdisplay_s3
+```
 
 ## Управление
 
