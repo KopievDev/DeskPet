@@ -27,7 +27,13 @@ for emotion in emotions:
 
 glyphs = {int(code, 16) for code in re.findall(r"\{0x([0-9A-F]{4}),\s*\{", font)}
 phrases = re.findall(r'return u8"([^"]+)";', source)
-assert len(phrases) == len(emotions), "Every emotion needs one comic phrase"
+assert len(phrases) == len(emotions), "Every emotion needs one cheeky comic phrase"
+persona_phrases = re.findall(
+    r'static const char k(?:Calm|Playful)[A-Za-z]+\[\] = u8"([^"]+)";',
+    source,
+)
+assert len(persona_phrases) == 6, "Expected six safe/playful dialogue variants"
+phrases += persona_phrases
 
 for phrase in phrases:
     missing = sorted({char for char in phrase if char != " " and ord(char) not in glyphs})
@@ -65,7 +71,11 @@ assert "enum class IdleGesture" in ambient
 for gesture in ("LookLeft", "LookRight", "Squint", "Yawn",
                 "Startled", "BrowBounce", "Wink"):
     assert gesture in ambient, f"Missing ambient gesture: {gesture}"
-assert "9000u + random32() % 9001u" in ambient
+assert "minInterval(personality_)" in ambient
+assert "maxInterval(personality_)" in ambient
+assert "kCalm[7]" in ambient
+assert "kPlayful[7]" in ambient
+assert "kCheeky[7]" in ambient
 assert "bool tick(uint32_t nowMs, bool eligible)" in ambient
 assert "idleGesture_ = gesture;" in face_cpp
 assert "float FaceAnimator::idleEnvelope() const" in face_cpp
@@ -79,5 +89,20 @@ for command in ("ambient on", "ambient off"):
 assert "cancelAmbient(now);" in serial
 assert (ROOT / "tests/idle_behavior_test.cpp").is_file()
 
-print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian quips, "
+personality = (ROOT / "include/Personality.h").read_text(encoding="utf-8")
+assert "enum class Personality" in personality
+for name in ("Calm", "Playful", "Cheeky"):
+    assert name in personality
+    assert f"Personality::{name}" in ambient
+    assert f"Personality::{name}" in source
+assert "Personality personality_ = Personality::Calm;" in face_header
+assert "Personality personality_ = Personality::Calm;" in ambient
+assert "const char* FaceAnimator::quipForEmotion(Emotion emotion) const" in source
+assert 'strncmp(command, "personality ", 12)' in serial
+assert "ambient.setPersonality(next, nowMs);" in serial
+assert "face.setPersonality(next, nowMs);" in serial
+assert 'Serial.print(personalityName(ambient.personality()))' in serial
+assert (ROOT / "tests/personality_test.cpp").is_file()
+
+print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
