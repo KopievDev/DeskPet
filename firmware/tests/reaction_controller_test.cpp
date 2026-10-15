@@ -94,13 +94,21 @@ int main() {
     reactions.nextEmotion(4400);
     checkMood(reactions, Emotion::Embarrassed);
 
-    // USER/demo must include Bewildered and wrap from the last emotion.
+    // USER/demo must include all four comic emotions before wrapping.
     reactions.begin(5000);
     reactions.chooseEmotion(Emotion::Bored, 5010);
     checkMood(reactions, Emotion::Bored);
     reactions.nextEmotion(5020);
     checkMood(reactions, Emotion::Bewildered);
     reactions.nextEmotion(5030);
+    checkMood(reactions, Emotion::Nerd);
+    reactions.nextEmotion(5040);
+    checkMood(reactions, Emotion::Derp);
+    reactions.nextEmotion(5050);
+    checkMood(reactions, Emotion::Gremlin);
+    reactions.nextEmotion(5060);
+    checkMood(reactions, Emotion::Panic);
+    reactions.nextEmotion(5070);
     checkMood(reactions, Emotion::Neutral);
 
     // USER hold "pet" shows Love briefly, then restores the manual
