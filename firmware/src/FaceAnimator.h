@@ -45,6 +45,7 @@ private:
     void updateTransition(uint32_t nowMs);
     void drawQuip();
     void drawIdleDetails(int eyeY);
+    void drawParticles(float openness);
     float idleEnvelope() const;
     const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
