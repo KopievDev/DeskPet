@@ -49,11 +49,13 @@ int main() {
 
     Canvas full;
     draw(full, 1.0f, 1.0f);
-    assert(full.filled() > 1700);
-    assert(full.filled() < 2000);
+    assert(full.filled() > 1900);
+    assert(full.filled() < 2300);
 
     // At the top there are two rounded lobes separated by a dip.
-    const int topY = 64 + deskpet_heart::kFirstRow - 32;
+    // Production renders at a 1.12 vertical scale, even at rest.
+    const int topY = 64 + deskpet_heart::roundToInt(
+        (static_cast<int>(deskpet_heart::kFirstRow) - 32) * 1.12f);
     assert(full.at(49, topY));
     assert(full.at(78, topY));
     assert(!full.at(63, topY));
@@ -62,7 +64,9 @@ int main() {
     // The center fills below the notch and narrows to a pointed tip.
     assert(full.at(63, topY + 10));
     assert(full.at(64, topY + 10));
-    const int tipY = topY + deskpet_heart::kRowCount - 1;
+    const int tipY = 64 + deskpet_heart::roundToInt(
+        (static_cast<int>(deskpet_heart::kFirstRow) +
+         static_cast<int>(deskpet_heart::kRowCount) - 1 - 32) * 1.12f);
     assert(full.at(63, tipY));
     assert(full.at(64, tipY));
     assert(!full.at(62, tipY));
