@@ -38,6 +38,7 @@ const char* emotionName(Emotion emotion) {
         case Emotion::Embarrassed: return "EMBARRASSED";
         case Emotion::Dizzy: return "DIZZY";
         case Emotion::Bored: return "BORED";
+        case Emotion::Bewildered: return "BEWILDERED";
         case Emotion::Count: break;
     }
     return "UNKNOWN";
@@ -125,6 +126,7 @@ const char* FaceAnimator::quipForEmotion(Emotion emotion) {
         case Emotion::Embarrassed: return u8"УПС...";
         case Emotion::Dizzy: return u8"ЧТО ЗА ДИЧЬ?";
         case Emotion::Bored: return u8"НУ И СКУКА";
+        case Emotion::Bewildered: return u8"ЭТО КАК?!";
         case Emotion::Count: break;
     }
     return nullptr;
@@ -258,6 +260,12 @@ FaceAnimator::EyePose FaceAnimator::targetEyePose(Emotion emotion, bool isLeft) 
             pose.pupilRadius = 10.0f;
             pose.lidLeft = 4.0f;
             pose.lidRight = 4.0f;
+            break;
+        case Emotion::Bewildered:
+            // Mostly open eyes, but the right brow and lid hesitate.
+            pose.openness = isLeft ? 0.95f : 0.86f;
+            pose.pupilRadius = 14.0f;
+            if (!isLeft) pose.lidRight = 8.0f;
             break;
     }
     return pose;
@@ -424,6 +432,15 @@ void FaceAnimator::animateBrows() {
                 slope[0] = slope[1] = 0.0f;
                 arch[0] = arch[1] = 1.0f;
                 break;
+            case Emotion::Bewildered:
+                // A raised left eyebrow and an uncertain right eyebrow.
+                y[0] = 33.0f;
+                y[1] = 48.0f;
+                slope[0] = -7.0f;
+                slope[1] = 3.0f;
+                arch[0] = 6.0f;
+                arch[1] = 1.0f;
+                break;
             case Emotion::Neutral:
             case Emotion::Count:
                 break;
@@ -551,6 +568,7 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool embarrassed = visualEmotion_ == Emotion::Embarrassed;
     const bool bored = visualEmotion_ == Emotion::Bored;
     const bool smug = visualEmotion_ == Emotion::Smug;
+    const bool bewildered = visualEmotion_ == Emotion::Bewildered;
 
     const int eyeW = static_cast<int>(pose.width + 0.5f);
     const int eyeH = static_cast<int>(pose.height * eyeOpen);
@@ -595,7 +613,25 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         }
     } else if (visibleH >= 20 && pupilRadius >= 3) {
         // Large surprised pupils cannot cross the white boundary.
-        const int lookOffset = confused ? (isLeft ? -8 : 7)
+        // Bewildered: only the RIGHT pupil slowly drifts toward the
+        // outside, waits there and then returns. 4.8-second seamless cycle,
+        // no blocking delay and no per-frame allocation.
+        int bewilderedOffset = 0;
+        if (bewildered && !isLeft) {
+            const uint32_t phase = (animationNowMs_ - emotionStartedMs_) % 4800u;
+            float progress = 0.0f;
+            if (phase >= 600u && phase < 2400u) {
+                progress = smoothStep(static_cast<float>(phase - 600u) / 1800.0f);
+            } else if (phase >= 2400u && phase < 2800u) {
+                progress = 1.0f;
+            } else if (phase >= 2800u && phase < 4600u) {
+                progress = 1.0f -
+                    smoothStep(static_cast<float>(phase - 2800u) / 1800.0f);
+            }
+            bewilderedOffset = static_cast<int>(progress * 13.0f + 0.5f);
+        }
+        const int lookOffset = bewildered ? bewilderedOffset
+            : confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
             : (bored || smug) ? (isLeft ? -6 : 8)
                             : static_cast<int>(gazeX_);
@@ -743,6 +779,27 @@ void FaceAnimator::render(float openness) {
             // Two tiny dots indicate a low-energy sigh.
             canvas_.fillCircle(width_ / 2 - 5, eyeY + 31, 2, kMuted);
             canvas_.fillCircle(width_ / 2 + 5, eyeY + 31, 2, kMuted);
+        } else if (visualEmotion_ == Emotion::Bewildered) {
+            // Tiny confused mouth, plus a drop of drool at its right edge.
+            // Located in the gap between eyes and above the bottom HUD.
+            const int mouthX = width_ / 2;
+            const int mouthY = eyeY + 29;
+            canvas_.drawLine(mouthX - 11, mouthY, mouthX + 5, mouthY + 2,
+                             kMuted);
+            canvas_.fillCircle(mouthX + 8, mouthY + 2, 2, kMuted);
+            const uint32_t phase =
+                (animationNowMs_ - emotionStartedMs_) % 3600u;
+            const float grow = phase < 2300u
+                ? smoothStep(static_cast<float>(phase) / 2300.0f)
+                : 1.0f - smoothStep(
+                    static_cast<float>(phase - 2300u) / 1300.0f);
+            const int length = static_cast<int>(grow * 8.0f + 0.5f);
+            if (length > 1) {
+                canvas_.drawLine(mouthX + 8, mouthY + 3,
+                                 mouthX + 8, mouthY + 3 + length, kAccent);
+                canvas_.fillCircle(mouthX + 8, mouthY + 3 + length,
+                                   2 + (length / 5), kAccent);
+            }
         }
     }
 
