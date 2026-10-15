@@ -4,6 +4,7 @@
 #include <LovyanGFX.hpp>
 
 #include "Emotion.h"
+#include "IdleBehavior.h"
 
 const char* emotionName(Emotion emotion);
 
@@ -26,6 +27,9 @@ public:
     bool sassEnabled() const { return sassEnabled_; }
     bool showQuip(uint32_t nowMs);
 
+    // Ambient gestures are visual-only: never replace the user's emotion.
+    void setIdleGesture(IdleGesture gesture, uint32_t startedMs);
+
 private:
     void render(float openness);
     void drawEye(int centerX, int centerY, float openness, bool isLeft);
@@ -35,6 +39,8 @@ private:
     void animateEyes();
     void updateTransition(uint32_t nowMs);
     void drawQuip();
+    void drawIdleDetails(int eyeY);
+    float idleEnvelope() const;
     static const char* quipForEmotion(Emotion emotion);
     static bool hasSpecialEyeShape(Emotion emotion);
     static float smoothStep(float t);
@@ -84,6 +90,8 @@ private:
     bool blinking_ = false;
     bool sleeping_ = false;
     bool ready_ = false;
+    IdleGesture idleGesture_ = IdleGesture::None;
+    uint32_t idleStartedMs_ = 0;
     bool sassEnabled_ = false;
     bool quipVisible_ = false;
     uint32_t quipStartedMs_ = 0;
