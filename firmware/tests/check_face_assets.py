@@ -6,7 +6,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-header = (ROOT / "src/FaceAnimator.h").read_text(encoding="utf-8")
+header = (ROOT / "include/Emotion.h").read_text(encoding="utf-8")
 source = (ROOT / "src/FaceAnimator.cpp").read_text(encoding="utf-8")
 serial = (ROOT / "src/main.cpp").read_text(encoding="utf-8")
 font = (ROOT / "include/ComicFont.h").read_text(encoding="utf-8")
@@ -20,7 +20,7 @@ assert len(emotions) == 16, f"Expected 16 emotions; got {len(emotions)}"
 for emotion in emotions:
     assert f"case Emotion::{emotion}: return" in source, f"Name missing: {emotion}"
     assert f"case Emotion::{emotion}:" in source, f"Pose missing: {emotion}"
-    assert f"face.setEmotion(Emotion::{emotion}, nowMs);" in serial, (
+    assert re.search(r'\{"[a-z]+",\s*Emotion::' + emotion + r'\}', serial), (
         f"Serial command missing: {emotion}"
     )
 
@@ -39,6 +39,16 @@ for command in ("sass on", "sass off", "quip", "demo on", "demo off"):
     assert f'strcmp(command, "{command}")' in serial, f"Missing: {command}"
 assert "const bool diagonal" in source, "Dizzy pupils must visibly animate"
 assert "kSpecialTransitionMs" in source, "Missing blink transitions"
+
+reaction = (ROOT / "include/ReactionController.h").read_text(encoding="utf-8")
+assert "kReactionDurationMs = 4500" in reaction
+assert "kDefaultIdleSeconds = 120" in reaction
+assert "void buildResult(bool success" in reaction
+assert "void nextEmotion(uint32_t nowMs)" in reaction
+assert 'strcmp(command, "event build-success")' in serial
+assert 'strcmp(command, "event build-failure")' in serial
+for control in ("idle on", "idle off", "status"):
+    assert f'strcmp(command, "{control}")' in serial, f"Missing control: {control}"
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian quips, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
