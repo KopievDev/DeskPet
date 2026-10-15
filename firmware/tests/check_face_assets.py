@@ -84,9 +84,11 @@ assert "void FaceAnimator::drawIdleDetails(int eyeY)" in face_cpp
 # In that case ambient must be gated again, rather than overriding the cameo.
 assert re.search(
     r"ambient\.tick\(\s*now\s*,\s*allowAmbient\s*&&\s*"
-    r"!reactions\.reactionActive\(\)\s*\)",
+    r"!reactions\.reactionActive\(\)\s*&&\s*"
+    r"userActivity\.presence\(\)\s*!=\s*"
+    r"deskpet_activity::Presence::Away\s*\)",
     serial,
-), "Ambient must not overwrite a newly triggered PetBond cameo"
+), "Ambient must not override build, PetBond or user-away comedy"
 assert "reactions.manualEmotion() == Emotion::Neutral" in serial
 assert "reactions.reactionActive()" in serial
 assert "reactions.idleActive()" in serial
@@ -253,7 +255,10 @@ assert "PetBond bond;" in serial
 assert "bond.pet(nowMs);" in serial
 assert "bond.surprise(nowMs);" in serial
 assert "bond.build(success, nowMs);" in serial
-assert "bond.tick(now, !face.isSleeping(), allowAmbient" in serial
+assert "const bool allowBond = allowAmbient &&" in serial
+assert "!reactions.reactionActive() &&" in serial
+assert "userActivity.presence() != deskpet_activity::Presence::Away" in serial
+assert "bond.tick(now, !face.isSleeping(), allowBond" in serial
 assert "reactions.showTemporary(comic, now, PetBond::kComicDurationMs)" in serial
 assert "face.setAffection(bond.score());" in serial
 assert "bond.status" not in serial  # status command is textual: bond status
@@ -302,6 +307,35 @@ assert 'strcmp(command, "build status")' in serial
 assert 'strcmp(command, "build reset")' in serial
 assert 'Serial.print(buildStory.consecutiveFailures());' in serial
 assert (ROOT / "tests/build_comedy_test.cpp").is_file()
+
+user_activity = (ROOT / "include/UserActivity.h").read_text(encoding="utf-8")
+assert "class Controller" in user_activity
+assert "enum class Presence" in user_activity
+assert "kIdleJokeIntervalMs = 90000u" in user_activity
+assert "kPendingLifetimeMs = 12000u" in user_activity
+assert "void idle(uint32_t nowMs)" in user_activity
+assert "void active(uint32_t nowMs)" in user_activity
+assert "bool tick(uint32_t nowMs, bool eligible, Personality personality," in user_activity
+assert "firstHostEvent ? Pending::None : Pending::Idle" in user_activity
+assert "Presence::Away" in user_activity
+assert '#include "UserActivity.h"' in serial
+assert "deskpet_activity::Controller userActivity;" in serial
+assert "userActivity.begin(startedAt);" in serial
+assert 'strcmp(command, "event user-idle")' in serial
+assert 'strcmp(command, "event user-active")' in serial
+assert 'strcmp(command, "activity on")' in serial
+assert 'strcmp(command, "activity off")' in serial
+assert 'strcmp(command, "activity status")' in serial
+assert "userActivity.tick(now, allowActivity, ambient.personality()," in serial
+assert "reactions.showTemporary(activityCue.emotion, now," in serial
+assert (ROOT / "tests/user_activity_test.cpp").is_file()
+
+helper = (ROOT.parent / "scripts/deskpet_activity.py").read_text(encoding="utf-8")
+assert '"HIDIdleTime"' in helper
+assert "event user-idle" in helper
+assert "event user-active" in helper
+assert "--simulate" in helper
+assert (ROOT.parent / "scripts/test_deskpet_activity.py").is_file()
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
