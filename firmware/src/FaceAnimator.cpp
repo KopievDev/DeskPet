@@ -65,6 +65,7 @@ bool FaceAnimator::begin() {
     }
 
     const uint32_t now = millis();
+    lifecycle_.begin(now);
     emotionStartedMs_ = now;
     animationNowMs_ = now;
     for (uint8_t index = 0; index < 2; ++index) {
@@ -72,7 +73,7 @@ bool FaceAnimator::begin() {
     }
     nextBlinkMs_ = now + 1800;
     nextLookMs_ = now + 1200;
-    render(1.0f);
+    render(lifecycle_.openness(now));
     return true;
 }
 
@@ -87,6 +88,8 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     // A second command during a transition starts from the currently
     // visible shape, not an obsolete emotion or the initial pose.
     const Emotion from = visualEmotion_;
+    if (lifecycle_.sleeping()) lifecycle_.wake(nowMs);
+    else lifecycle_.interruptBoot(nowMs);
     emotion_ = emotion;
     idleGesture_ = IdleGesture::None;
     emotionStartedMs_ = nowMs;
@@ -234,7 +237,12 @@ void FaceAnimator::nextEmotion(uint32_t nowMs) {
 }
 
 void FaceAnimator::setSleeping(bool sleeping, uint32_t nowMs) {
-    sleeping_ = sleeping;
+    // The public sleeping state changes immediately, so Serial, BOOT and
+    // build notifications retain their existing priority. The *eyes* take
+    // 850ms to close or 1050ms to reopen; rapid reversals are continuous.
+    if (sleeping) lifecycle_.sleep(nowMs);
+    else lifecycle_.wake(nowMs);
+    sleeping_ = lifecycle_.sleeping();
     idleGesture_ = IdleGesture::None;
     if (sleeping_) quipVisible_ = false;
     transitionActive_ = false;
@@ -555,6 +563,7 @@ void FaceAnimator::update(uint32_t nowMs) {
     if (lastFrameMs_ != 0 && nowMs - lastFrameMs_ < kFrameIntervalMs) return;
     lastFrameMs_ = nowMs;
     animationNowMs_ = nowMs;
+    lifecycle_.advance(nowMs);
     updateTransition(nowMs);
 
     if (!sleeping_ && idleGesture_ == IdleGesture::None &&
@@ -582,8 +591,9 @@ void FaceAnimator::update(uint32_t nowMs) {
         }
     }
 
-    const float openness = sleeping_ ? 0.055f
-        : (1.0f - blink * 0.94f) * transitionOpenness_;
+    const float openness =
+        lifecycle_.openness(nowMs) * (1.0f - blink * 0.94f) *
+        transitionOpenness_;
     animateBrows();
     animateEyes();
     animateMoodColors();
@@ -634,7 +644,7 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     }
 
     // Both natural blinks and transition blinks finish in the same shape.
-    if (sleeping_ || eyeOpen < 0.14f) {
+    if (eyeOpen < 0.14f) {
         drawClosedEye(centerX, centerY);
         return;
     }
@@ -683,9 +693,18 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool smug = visualEmotion_ == Emotion::Smug;
     const bool bewildered = visualEmotion_ == Emotion::Bewildered;
 
-    const int eyeW = static_cast<int>(pose.width + 0.5f);
+    // A gentle vertical stretch as the pet wakes up; the actual eye
+    // opening is still controlled by the lifecycle state machine.
+    float stretch = 0.0f;
+    if (lifecycle_.phase() == deskpet_lifecycle::Phase::Waking) {
+        const float progress = clampFloat(
+            static_cast<float>(lifecycle_.elapsed(animationNowMs_)) /
+                deskpet_lifecycle::kWakeDurationMs, 0.0f, 1.0f);
+        stretch = 4.0f * sinf(3.14159265f * progress);
+    }
+    const int eyeW = static_cast<int>(pose.width + stretch + 0.5f);
     const int eyeH = static_cast<int>(
-        (pose.height + (idleGesture_ == IdleGesture::Startled
+        (pose.height + stretch + (idleGesture_ == IdleGesture::Startled
                           ? 7.0f * ambient : 0.0f)) * eyeOpen);
     const int visibleH = eyeH < 6 ? 6 : eyeH;
     const int bounce = excited
@@ -953,6 +972,58 @@ void FaceAnimator::drawIdleDetails(int eyeY) {
     }
 }
 
+void FaceAnimator::drawLifecycleOverlay() {
+    const auto phase = lifecycle_.phase();
+    const uint32_t elapsed = lifecycle_.elapsed(animationNowMs_);
+    if (phase == deskpet_lifecycle::Phase::Booting) {
+        // Friendly splash above the eyebrows while the eyes gradually
+        // open. Drawn only on the existing canvas; no blocking splash page.
+        const uint16_t textColor = deskpet_mood::blend565(
+            kBackground, kEye,
+            static_cast<uint8_t>(255u - (elapsed * 110u) /
+                deskpet_lifecycle::kBootDurationMs));
+        canvas_.setTextColor(textColor, kBackground);
+        canvas_.setTextSize(1);
+        canvas_.setCursor(width_ / 2 - 18, 13);
+        canvas_.print("HELLO!");
+        const int pulse = 2 + static_cast<int>((elapsed / 190u) % 3u);
+        for (int side = -1; side <= 1; side += 2) {
+            const int x = width_ / 2 + side * 117;
+            const int y = 87;
+            canvas_.drawLine(x - pulse, y, x + pulse, y, kAccent);
+            canvas_.drawLine(x, y - pulse, x, y + pulse, kAccent);
+        }
+    } else if (phase == deskpet_lifecycle::Phase::FallingAsleep ||
+               phase == deskpet_lifecycle::Phase::Asleep) {
+        // Tiny drifting Zs outside the right eye. Kept below the profile
+        // label and above the bottom HUD; animated even in stable sleep.
+        const uint32_t floatMs = animationNowMs_ / 180u;
+        const uint8_t brightness = static_cast<uint8_t>(
+            95u + (animationNowMs_ / 35u) % 90u);
+        const uint16_t color =
+            deskpet_mood::blend565(kBackground, kMuted, brightness);
+        canvas_.setTextColor(color, kBackground);
+        canvas_.setTextSize(1);
+        canvas_.setCursor(width_ - 49, 72 - static_cast<int>(floatMs % 13u));
+        canvas_.print("z");
+        canvas_.setCursor(width_ - 34, 54 - static_cast<int>((floatMs + 6u) % 11u));
+        canvas_.print("Z");
+    } else if (phase == deskpet_lifecycle::Phase::Waking) {
+        const uint32_t duration = deskpet_lifecycle::kWakeDurationMs;
+        const float fraction = deskpet_lifecycle::ease(
+            static_cast<float>(elapsed) / duration);
+        const uint16_t color = deskpet_mood::blend565(
+            kBackground, kAccent,
+            static_cast<uint8_t>((1.0f - fraction) * 220.0f));
+        if (elapsed < duration - 120u) {
+            canvas_.setTextColor(color, kBackground);
+            canvas_.setTextSize(1);
+            canvas_.setCursor(width_ / 2 - 12, 16);
+            canvas_.print("HI!");
+        }
+    }
+}
+
 void FaceAnimator::render(float openness) {
     canvas_.fillScreen(kBackground);
 
@@ -1091,6 +1162,7 @@ void FaceAnimator::render(float openness) {
     canvas_.setCursor(width_ - 80, height_ - 17);
     canvas_.print("v0.1");
 
+    drawLifecycleOverlay();
     drawQuip(); // overlay after HUD; does not obscure the large eyes
     canvas_.pushSprite(0, 0);
 }
