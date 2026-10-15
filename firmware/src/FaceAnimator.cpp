@@ -45,6 +45,10 @@ const char* emotionName(Emotion emotion) {
         case Emotion::Dizzy: return "DIZZY";
         case Emotion::Bored: return "BORED";
         case Emotion::Bewildered: return "BEWILDERED";
+        case Emotion::Nerd: return "NERD";
+        case Emotion::Derp: return "DERP";
+        case Emotion::Gremlin: return "GREMLIN";
+        case Emotion::Panic: return "PANIC";
         case Emotion::Count: break;
     }
     return "UNKNOWN";
@@ -184,6 +188,10 @@ const char* FaceAnimator::quipForEmotion(Emotion emotion) const {
         case Emotion::Dizzy: return u8"ЧТО ЗА ДИЧЬ?";
         case Emotion::Bored: return u8"НУ И СКУКА";
         case Emotion::Bewildered: return u8"ЭТО КАК?!";
+        case Emotion::Nerd: return u8"ЭТО КАК?!";
+        case Emotion::Derp: return u8"ЧЕГО?!";
+        case Emotion::Gremlin: return u8"ХЕ-ХЕ, ПОПАЛ!";
+        case Emotion::Panic: return u8"НУ ВСЕ, БЛ#!!";
         case Emotion::Count: break;
     }
     return nullptr;
@@ -263,7 +271,11 @@ bool FaceAnimator::hasSpecialEyeShape(Emotion emotion) {
     return emotion == Emotion::Happy ||
            emotion == Emotion::Love ||
            emotion == Emotion::Playful ||
-           emotion == Emotion::Dizzy;
+           emotion == Emotion::Dizzy ||
+           emotion == Emotion::Nerd ||
+           emotion == Emotion::Derp ||
+           emotion == Emotion::Gremlin ||
+           emotion == Emotion::Panic;
 }
 
 float FaceAnimator::smoothStep(float t) {
@@ -360,6 +372,26 @@ FaceAnimator::EyePose FaceAnimator::targetEyePose(Emotion emotion, bool isLeft) 
             pose.openness = isLeft ? 0.95f : 0.86f;
             pose.pupilRadius = 14.0f;
             if (!isLeft) pose.lidRight = 8.0f;
+            break;
+        case Emotion::Nerd:
+            pose.width = 69.0f; pose.height = 72.0f;
+            pose.pupilRadius = 14.0f; pose.openness = 0.94f;
+            break;
+        case Emotion::Derp:
+            pose.width = isLeft ? 67.0f : 72.0f;
+            pose.height = isLeft ? 70.0f : 77.0f;
+            pose.openness = isLeft ? 0.82f : 1.0f;
+            pose.pupilRadius = isLeft ? 11.0f : 17.0f;
+            break;
+        case Emotion::Gremlin:
+            pose.openness = isLeft ? 0.65f : 0.72f;
+            pose.pupilRadius = 12.0f;
+            if (isLeft) pose.lidRight = 13.0f;
+            else pose.lidLeft = 13.0f;
+            break;
+        case Emotion::Panic:
+            pose.width = 66.0f; pose.height = 79.0f;
+            pose.pupilRadius = 11.0f;
             break;
     }
     return pose;
@@ -548,6 +580,26 @@ void FaceAnimator::animateBrows() {
                 arch[0] = 6.0f;
                 arch[1] = 1.0f;
                 break;
+            case Emotion::Nerd:
+                y[0] = y[1] = 37.0f;
+                slope[0] = -3.0f; slope[1] = 3.0f;
+                arch[0] = arch[1] = 7.0f;
+                break;
+            case Emotion::Derp:
+                y[0] = 46.0f; y[1] = 33.0f;
+                slope[0] = 6.0f; slope[1] = -5.0f;
+                arch[0] = 2.0f; arch[1] = 8.0f;
+                break;
+            case Emotion::Gremlin:
+                y[0] = y[1] = 49.0f;
+                slope[0] = 8.0f; slope[1] = -8.0f;
+                arch[0] = arch[1] = 1.0f;
+                break;
+            case Emotion::Panic:
+                y[0] = y[1] = 31.0f;
+                slope[0] = -6.0f; slope[1] = 6.0f;
+                arch[0] = arch[1] = 5.0f;
+                break;
             case Emotion::Neutral:
             case Emotion::Count:
                 break;
@@ -696,6 +748,9 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool embarrassed = visualEmotion_ == Emotion::Embarrassed;
     const bool bored = visualEmotion_ == Emotion::Bored;
     const bool smug = visualEmotion_ == Emotion::Smug;
+    const bool derp = visualEmotion_ == Emotion::Derp;
+    const bool gremlin = visualEmotion_ == Emotion::Gremlin;
+    const bool panic = visualEmotion_ == Emotion::Panic;
     const bool bewildered = visualEmotion_ == Emotion::Bewildered;
 
     // A gentle vertical stretch as the pet wakes up; the actual eye
@@ -716,8 +771,9 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         ? static_cast<int>(2.5f * sinf(
               static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.011f))
         : 0;
-    if (furious) {
-        centerX += (animationNowMs_ / 70u) % 2u == 0u ? -1 : 1;
+    if (furious || panic) {
+        const uint32_t jitterMs = panic ? 46u : 70u;
+        centerX += (animationNowMs_ / jitterMs) % 2u == 0u ? -1 : 1;
     }
     const int left = centerX - eyeW / 2;
     const int top = centerY - visibleH / 2 + bounce;
@@ -787,7 +843,11 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
             }
             bewilderedOffset = static_cast<int>(progress * 13.0f + 0.5f);
         }
-        int lookOffset = bewildered ? bewilderedOffset
+        int lookOffset = derp ? (isLeft ? 11 :
+            -10 + static_cast<int>(6.0f * sinf(
+                static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.0028f)))
+            : gremlin ? (isLeft ? 5 : -5)
+            : bewildered ? bewilderedOffset
             : confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
             : (bored || smug) ? (isLeft ? -6 : 8)
