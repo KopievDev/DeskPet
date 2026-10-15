@@ -51,11 +51,12 @@ public:
     // when the Mac helper first connects.
     void idle(uint32_t nowMs) {
         if (!enabled_ || state_ == Presence::Away) return;
+        const bool firstHostEvent = state_ == Presence::Unknown;
         state_ = Presence::Away;
         awaySinceMs_ = nowMs;
         nextJokeMs_ = nowMs + kIdleJokeIntervalMs;
         jokes_ = 0;
-        pending_ = Pending::Idle;
+        pending_ = firstHostEvent ? Pending::None : Pending::Idle;
         pendingAtMs_ = nowMs;
     }
 
