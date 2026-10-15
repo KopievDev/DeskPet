@@ -871,8 +871,11 @@ void FaceAnimator::render(float openness) {
     // a topology-changing blink.
     if (!sleeping_ && openness > 0.35f) {
         if (visualEmotion_ == Emotion::Happy || visualEmotion_ == Emotion::Love) {
-            canvas_.fillCircle(leftEyeX - 47, eyeY + 13, 3, kAccent);
-            canvas_.fillCircle(rightEyeX + 47, eyeY + 13, 3, kAccent);
+            // Match Love's cheeks to its warm red hearts; leave Happy purple.
+            const uint16_t cheekColor =
+                visualEmotion_ == Emotion::Love ? kLoveRed : kAccent;
+            canvas_.fillCircle(leftEyeX - 47, eyeY + 13, 3, cheekColor);
+            canvas_.fillCircle(rightEyeX + 47, eyeY + 13, 3, cheekColor);
         } else if (visualEmotion_ == Emotion::Sad) {
             // A single falling tear; position is always above the HUD.
             const int drop = static_cast<int>(
