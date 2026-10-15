@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "Personality.h"
+
 // Small, deterministic, allocation-free ambient personality scheduler.
 // The renderer owns the actual animation; this class only emits changes.
 // A reaction, an explicit emotion, demo mode, or sleep can suppress it.
@@ -28,6 +30,7 @@ public:
     }
 
     bool enabled() const { return enabled_; }
+    Personality personality() const { return personality_; }
     IdleGesture gesture() const { return current_; }
     uint32_t startedMs() const { return startedMs_; }
     bool isActive() const { return active_; }
@@ -35,6 +38,31 @@ public:
     void setEnabled(bool enabled, uint32_t nowMs) {
         enabled_ = enabled;
         reset(nowMs);
+    }
+
+    // Profile changes cancel the current gesture and restart the quiet
+    // interval. This does not touch the manually chosen emotion.
+    void setPersonality(Personality personality, uint32_t nowMs) {
+        personality_ = personality;
+        reset(nowMs);
+    }
+
+    static uint32_t minInterval(Personality personality) {
+        switch (personality) {
+            case Personality::Calm: return 14000u;
+            case Personality::Playful: return 6000u;
+            case Personality::Cheeky: return 9000u;
+        }
+        return 14000u;
+    }
+
+    static uint32_t maxInterval(Personality personality) {
+        switch (personality) {
+            case Personality::Calm: return 26000u;
+            case Personality::Playful: return 12000u;
+            case Personality::Cheeky: return 16000u;
+        }
+        return 26000u;
     }
 
     // Cancels any ambient action on explicit user interaction. The next
@@ -103,18 +131,30 @@ private:
         return rng_;
     }
 
-    uint32_t nextInterval() { return 9000u + random32() % 9001u; }
+    uint32_t nextInterval() {
+        const uint32_t minMs = minInterval(personality_);
+        return minMs + random32() % (maxInterval(personality_) - minMs + 1u);
+    }
 
     IdleGesture nextGesture() {
-        switch (random32() % 7u) {
-            case 0: return IdleGesture::LookLeft;
-            case 1: return IdleGesture::LookRight;
-            case 2: return IdleGesture::Squint;
-            case 3: return IdleGesture::Yawn;
-            case 4: return IdleGesture::Startled;
-            case 5: return IdleGesture::BrowBounce;
-            default: return IdleGesture::Wink;
+        // Hand-tuned probabilities (percent); each profile sums to 100.
+        // Calm looks around and yawns, Playful winks and raises brows,
+        // Cheeky tends to squint, wink and look startled.
+        static const uint8_t kCalm[7] = {25, 25, 18, 20, 2, 7, 3};
+        static const uint8_t kPlayful[7] = {12, 12, 8, 5, 18, 22, 23};
+        static const uint8_t kCheeky[7] = {10, 10, 23, 4, 16, 17, 20};
+        const uint8_t* weights = kCalm;
+        if (personality_ == Personality::Playful) weights = kPlayful;
+        else if (personality_ == Personality::Cheeky) weights = kCheeky;
+
+        uint32_t roll = random32() % 100u;
+        for (uint8_t index = 0; index < 7; ++index) {
+            if (roll < weights[index]) {
+                return static_cast<IdleGesture>(index + 1u);
+            }
+            roll -= weights[index];
         }
+        return IdleGesture::LookLeft; // unreachable if weights sum to 100
     }
 
     uint32_t rng_ = 0xD35C9A71u;
@@ -123,5 +163,6 @@ private:
     IdleGesture current_ = IdleGesture::None;
     bool active_ = false;
     bool enabled_ = true;
+    Personality personality_ = Personality::Calm;
     bool wasAllowed_ = false;
 };
