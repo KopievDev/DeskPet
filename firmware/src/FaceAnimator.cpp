@@ -111,19 +111,25 @@ const char* FaceAnimator::quipForEmotion(Emotion emotion) const {
     // The comic bubble remains opt-in in ALL profiles.
     // Calm = reassuring, Playful = teasing, Cheeky = existing spicy
     // censored dialogue. Reuse the same tiny Cyrillic glyph subset.
+    static const char kCalmPositive[] = u8"ВОТ ЭТО ДА!";
+    static const char kCalmNegative[] = u8"НУ И ЛАДНО";
+    static const char kCalmDefault[] = u8"ВСЕ ОК!";
+    static const char kPlayfulPositive[] = u8"ХЕ-ХЕ, ПОПАЛ!";
+    static const char kPlayfulNegative[] = u8"ОЙ, БЛИН...";
+    static const char kPlayfulDefault[] = u8"ЧЕГО?!";
     if (personality_ == Personality::Calm) {
         switch (emotion) {
             case Emotion::Happy:
             case Emotion::Excited:
             case Emotion::Love:
-                return u8"ВОТ ЭТО ДА!";
+                return kCalmPositive;
             case Emotion::Furious:
             case Emotion::Angry:
             case Emotion::Sad:
             case Emotion::Bored:
-                return u8"НУ И ЛАДНО";
+                return kCalmNegative;
             case Emotion::Count: return nullptr;
-            default: return u8"ВСЕ ОК!";
+            default: return kCalmDefault;
         }
     }
 
@@ -133,14 +139,14 @@ const char* FaceAnimator::quipForEmotion(Emotion emotion) const {
             case Emotion::Excited:
             case Emotion::Love:
             case Emotion::Playful:
-                return u8"ХЕ-ХЕ, ПОПАЛ!";
+                return kPlayfulPositive;
             case Emotion::Angry:
             case Emotion::Furious:
             case Emotion::Sad:
             case Emotion::Bored:
-                return u8"ОЙ, БЛИН...";
+                return kPlayfulNegative;
             case Emotion::Count: return nullptr;
-            default: return u8"ЧЕГО?!";
+            default: return kPlayfulDefault;
         }
     }
 
