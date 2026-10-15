@@ -1,4 +1,5 @@
 #include "FaceAnimator.h"
+#include "ComicFont.h"
 
 #include <math.h>
 
@@ -11,6 +12,8 @@ constexpr uint16_t kMuted = 0x94B2;
 constexpr uint32_t kFrameIntervalMs = 33;
 constexpr uint32_t kBlinkDurationMs = 180;
 constexpr uint32_t kSpecialTransitionMs = 360; // close old shape, open new one
+constexpr uint32_t kQuipDurationMs = 2500;
+constexpr uint32_t kQuipSlideMs = 180;
 
 float clampFloat(float value, float minValue, float maxValue) {
     return value < minValue ? minValue : (value > maxValue ? maxValue : value);
@@ -30,6 +33,11 @@ const char* emotionName(Emotion emotion) {
         case Emotion::Confused: return "CONFUSED";
         case Emotion::Excited: return "EXCITED";
         case Emotion::Playful: return "PLAYFUL";
+        case Emotion::Smug: return "SMUG";
+        case Emotion::Furious: return "FURIOUS";
+        case Emotion::Embarrassed: return "EMBARRASSED";
+        case Emotion::Dizzy: return "DIZZY";
+        case Emotion::Bored: return "BORED";
         case Emotion::Count: break;
     }
     return "UNKNOWN";
@@ -74,6 +82,8 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     const Emotion from = visualEmotion_;
     emotion_ = emotion;
     emotionStartedMs_ = nowMs;
+    if (sassEnabled_) showQuip(nowMs);
+    else quipVisible_ = false;
     sleeping_ = false;
     blinking_ = false;
     nextBlinkMs_ = nowMs + 1300;
@@ -95,6 +105,46 @@ void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     lastFrameMs_ = 0;
 }
 
+const char* FaceAnimator::quipForEmotion(Emotion emotion) {
+    // Short, deliberately censored Russian quips. Not emitted to Serial or
+    // shown at all until a user explicitly enables sass mode.
+    switch (emotion) {
+        case Emotion::Neutral: return u8"ЭЙ, ТЫ ЧЕ?";
+        case Emotion::Happy: return u8"ВОТ ЭТО ДА!";
+        case Emotion::Curious: return u8"ЧЕГО?!";
+        case Emotion::Surprised: return u8"ЧТО ЗА ДИЧЬ?";
+        case Emotion::Sleepy: return u8"ГДЕ МОЙ КОФЕ?";
+        case Emotion::Angry: return u8"НУ ВСЕ, БЛ#!!";
+        case Emotion::Sad: return u8"ОЙ, БЛИН...";
+        case Emotion::Love: return u8"КТО ТУТ БОСС?";
+        case Emotion::Confused: return u8"ЗАЧЕМ?!";
+        case Emotion::Excited: return u8"ВОТ ЭТО ДА!";
+        case Emotion::Playful: return u8"ХЕ-ХЕ, ПОПАЛ!";
+        case Emotion::Smug: return u8"КТО ТУТ БОСС?";
+        case Emotion::Furious: return u8"ИДИ НА Х#$#!!";
+        case Emotion::Embarrassed: return u8"УПС...";
+        case Emotion::Dizzy: return u8"ЧТО ЗА ДИЧЬ?";
+        case Emotion::Bored: return u8"НУ И СКУКА";
+        case Emotion::Count: break;
+    }
+    return nullptr;
+}
+
+void FaceAnimator::setSassEnabled(bool enabled, uint32_t nowMs) {
+    sassEnabled_ = enabled;
+    quipVisible_ = false;
+    if (enabled && !sleeping_) showQuip(nowMs);
+    lastFrameMs_ = 0;
+}
+
+bool FaceAnimator::showQuip(uint32_t nowMs) {
+    if (!sassEnabled_ || sleeping_ || !quipForEmotion(emotion_)) return false;
+    quipStartedMs_ = nowMs;
+    quipVisible_ = true;
+    lastFrameMs_ = 0;
+    return true;
+}
+
 void FaceAnimator::nextEmotion(uint32_t nowMs) {
     const auto next = (static_cast<uint8_t>(emotion_) + 1) %
                       static_cast<uint8_t>(Emotion::Count);
@@ -103,6 +153,7 @@ void FaceAnimator::nextEmotion(uint32_t nowMs) {
 
 void FaceAnimator::setSleeping(bool sleeping, uint32_t nowMs) {
     sleeping_ = sleeping;
+    if (sleeping_) quipVisible_ = false;
     transitionActive_ = false;
     transitionOpenness_ = 1.0f;
     transitionStartOpenness_ = 1.0f;
@@ -115,7 +166,8 @@ void FaceAnimator::setSleeping(bool sleeping, uint32_t nowMs) {
 bool FaceAnimator::hasSpecialEyeShape(Emotion emotion) {
     return emotion == Emotion::Happy ||
            emotion == Emotion::Love ||
-           emotion == Emotion::Playful;
+           emotion == Emotion::Playful ||
+           emotion == Emotion::Dizzy;
 }
 
 float FaceAnimator::smoothStep(float t) {
@@ -175,6 +227,37 @@ FaceAnimator::EyePose FaceAnimator::targetEyePose(Emotion emotion, bool isLeft) 
             break;
         case Emotion::Playful:
             if (!isLeft) pose.lidLeft = 6.0f;
+            break;
+        case Emotion::Smug:
+            pose.openness = isLeft ? 0.61f : 0.81f;
+            pose.pupilRadius = isLeft ? 11.0f : 14.0f;
+            if (isLeft) pose.lidLeft = 10.0f;
+            else pose.lidRight = 5.0f;
+            break;
+        case Emotion::Furious:
+            pose.width = 69.0f;
+            pose.height = 70.0f;
+            pose.openness = 0.79f;
+            pose.pupilRadius = 10.0f;
+            if (isLeft) pose.lidRight = 27.0f;
+            else pose.lidLeft = 27.0f;
+            break;
+        case Emotion::Embarrassed:
+            pose.openness = 0.70f;
+            pose.pupilRadius = 11.0f;
+            pose.lidLeft = 4.0f;
+            pose.lidRight = 4.0f;
+            break;
+        case Emotion::Dizzy:
+            pose.width = 68.0f;
+            pose.height = 76.0f;
+            pose.pupilRadius = 0.0f;
+            break;
+        case Emotion::Bored:
+            pose.openness = isLeft ? 0.49f : 0.57f;
+            pose.pupilRadius = 10.0f;
+            pose.lidLeft = 4.0f;
+            pose.lidRight = 4.0f;
             break;
     }
     return pose;
@@ -308,6 +391,38 @@ void FaceAnimator::animateBrows() {
                 slope[1] = 4.0f;
                 arch[0] = 2.0f;
                 arch[1] = 6.0f;
+                break;
+            case Emotion::Smug:
+                y[0] = 51.0f;
+                y[1] = 39.0f;
+                slope[0] = 4.0f;
+                slope[1] = -7.0f;
+                arch[0] = 2.0f;
+                arch[1] = 6.0f;
+                break;
+            case Emotion::Furious:
+                y[0] = y[1] = 47.0f;
+                slope[0] = 14.0f;
+                slope[1] = -14.0f;
+                arch[0] = arch[1] = 0.0f;
+                break;
+            case Emotion::Embarrassed:
+                y[0] = y[1] = 48.0f;
+                slope[0] = -4.0f;
+                slope[1] = 4.0f;
+                arch[0] = arch[1] = 3.0f;
+                break;
+            case Emotion::Dizzy:
+                y[0] = 40.0f;
+                y[1] = 46.0f;
+                slope[0] = -5.0f;
+                slope[1] = 5.0f;
+                arch[0] = arch[1] = 5.0f;
+                break;
+            case Emotion::Bored:
+                y[0] = y[1] = 51.0f;
+                slope[0] = slope[1] = 0.0f;
+                arch[0] = arch[1] = 1.0f;
                 break;
             case Emotion::Neutral:
             case Emotion::Count:
