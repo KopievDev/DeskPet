@@ -7,6 +7,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 header = (ROOT / "include/Emotion.h").read_text(encoding="utf-8")
+face_header = (ROOT / "src/FaceAnimator.h").read_text(encoding="utf-8")
 source = (ROOT / "src/FaceAnimator.cpp").read_text(encoding="utf-8")
 serial = (ROOT / "src/main.cpp").read_text(encoding="utf-8")
 font = (ROOT / "include/ComicFont.h").read_text(encoding="utf-8")
@@ -33,7 +34,7 @@ for phrase in phrases:
     assert not missing, f"Missing comic glyphs {missing!r} in {phrase!r}"
     assert len(phrase) * 8 + 18 <= 190, f"Comic bubble too wide: {phrase!r}"
 
-assert "bool sassEnabled_ = false;" in header, "Profanity must default to OFF"
+assert "bool sassEnabled_ = false;" in face_header, "Profanity must default to OFF"
 assert "if (!sassEnabled_ || !quipVisible_ || sleeping_)" in source
 for command in ("sass on", "sass off", "quip", "demo on", "demo off"):
     assert f'strcmp(command, "{command}")' in serial, f"Missing: {command}"
