@@ -258,5 +258,23 @@ assert "checkMood(reactions, Emotion::Panic);" in (
     ROOT / "tests/reaction_controller_test.cpp"
 ).read_text(encoding="utf-8")
 
+skits = (ROOT / "include/ComicSkits.h").read_text(encoding="utf-8")
+assert "constexpr uint32_t kSceneDurationMs = 4800u" in skits
+assert "inline Frame at(Emotion mood, uint32_t elapsedMs)" in skits
+assert "inline uint32_t lerpEnvelope(" in skits
+assert "sweatAlpha" in skits and "const uint32_t drip = t % 1600u;" in skits
+for mood in ("Nerd", "Derp", "Gremlin", "Panic"):
+    assert f"case Emotion::{mood}:" in skits, f"Missing acting scene {mood}"
+assert '#include "ComicSkits.h"' in source
+assert "deskpet_comics::at(" in source
+assert "skit.glassesLift" in source
+assert "skit.tongueDrop" in source
+assert "skit.grinLift" in source
+assert "skit.jawShake" in source
+assert "skit.sweatAlpha" in source
+assert 'strcmp(command, "comic next")' in serial
+assert 'Serial.println("Comic: ");' not in serial  # use print, not println
+assert (ROOT / "tests/comic_skits_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
