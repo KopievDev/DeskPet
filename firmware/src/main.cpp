@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <LilyGo_LovyanGFX.h>
+#include "DeskPetTDisplayS3.h"
 
 #include "FaceAnimator.h"
 
@@ -8,7 +8,7 @@ constexpr uint8_t kUserButtonPin = 14;
 constexpr uint8_t kBootButtonPin = 0;
 constexpr uint32_t kDebounceMs = 35;
 
-LilyGo_T_Display_S3 display;
+DeskPetTDisplayS3 display;
 FaceAnimator face(display);
 
 struct Button {
