@@ -10,6 +10,7 @@ constexpr uint16_t kAccent = 0x5F1F;
 constexpr uint16_t kMuted = 0x94B2;
 constexpr uint32_t kFrameIntervalMs = 33;
 constexpr uint32_t kBlinkDurationMs = 180;
+constexpr uint32_t kSpecialTransitionMs = 360; // close old shape, open new one
 
 float clampFloat(float value, float minValue, float maxValue) {
     return value < minValue ? minValue : (value > maxValue ? maxValue : value);
@@ -51,6 +52,9 @@ bool FaceAnimator::begin() {
     const uint32_t now = millis();
     emotionStartedMs_ = now;
     animationNowMs_ = now;
+    for (uint8_t index = 0; index < 2; ++index) {
+        eyes_[index] = targetEyePose(emotion_, index == 0);
+    }
     nextBlinkMs_ = now + 1800;
     nextLookMs_ = now + 1200;
     render(1.0f);
@@ -63,12 +67,28 @@ bool FaceAnimator::deadlineReached(uint32_t nowMs, uint32_t deadlineMs) {
 
 void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     if (emotion == Emotion::Count) return;
+    if (emotion == emotion_ && !sleeping_) return;
+
+    // A second command during a transition starts from the currently
+    // visible shape, not an obsolete emotion or the initial pose.
+    const Emotion from = visualEmotion_;
     emotion_ = emotion;
     emotionStartedMs_ = nowMs;
     sleeping_ = false;
     blinking_ = false;
     nextBlinkMs_ = nowMs + 1300;
-    lastFrameMs_ = 0; // immediately display new state on next update
+
+    // Rectangles can smoothly morph their geometry. Curved smile lines,
+    // hearts and winks have a different topology: conceal the shape change
+    // in a short closing/reopening eyelid animation.
+    transitionActive_ = hasSpecialEyeShape(from) ||
+                        hasSpecialEyeShape(emotion);
+    transitionRevealed_ = false;
+    transitionFrom_ = from;
+    transitionStartedMs_ = nowMs;
+    transitionOpenness_ = 1.0f;
+    if (!transitionActive_) visualEmotion_ = emotion;
+    lastFrameMs_ = 0;
 }
 
 void FaceAnimator::nextEmotion(uint32_t nowMs) {
@@ -79,9 +99,128 @@ void FaceAnimator::nextEmotion(uint32_t nowMs) {
 
 void FaceAnimator::setSleeping(bool sleeping, uint32_t nowMs) {
     sleeping_ = sleeping;
+    transitionActive_ = false;
+    transitionOpenness_ = 1.0f;
+    visualEmotion_ = emotion_;
     blinking_ = false;
     nextBlinkMs_ = nowMs + 2500;
     lastFrameMs_ = 0;
+}
+
+bool FaceAnimator::hasSpecialEyeShape(Emotion emotion) {
+    return emotion == Emotion::Happy ||
+           emotion == Emotion::Love ||
+           emotion == Emotion::Playful;
+}
+
+float FaceAnimator::smoothStep(float t) {
+    const float x = clampFloat(t, 0.0f, 1.0f);
+    return x * x * (3.0f - 2.0f * x);
+}
+
+FaceAnimator::EyePose FaceAnimator::targetEyePose(Emotion emotion, bool isLeft) {
+    EyePose pose;
+    switch (emotion) {
+        case Emotion::Neutral:
+        case Emotion::Happy:
+        case Emotion::Love:
+        case Emotion::Count:
+            break;
+        case Emotion::Curious:
+            if (isLeft) pose.lidLeft = 6.0f;
+            else {
+                pose.openness = 0.79f;
+                pose.lidRight = 12.0f;
+            }
+            break;
+        case Emotion::Surprised:
+            pose.width = 66.0f;
+            pose.height = 79.0f;
+            pose.pupilRadius = 21.0f; // prominent enlarged pupils
+            break;
+        case Emotion::Sleepy:
+            pose.openness = 0.38f;
+            if (isLeft) pose.lidLeft = 9.0f;
+            else pose.lidRight = 9.0f;
+            break;
+        case Emotion::Angry:
+            pose.openness = 0.83f;
+            pose.pupilRadius = 12.0f;
+            if (isLeft) pose.lidRight = 23.0f;
+            else pose.lidLeft = 23.0f;
+            break;
+        case Emotion::Sad:
+            pose.openness = 0.78f * (isLeft ? 0.88f : 0.95f);
+            if (isLeft) pose.lidLeft = 13.0f;
+            else pose.lidRight = 13.0f;
+            break;
+        case Emotion::Confused:
+            if (isLeft) pose.lidLeft = 6.0f;
+            else {
+                pose.openness = 0.61f;
+                pose.lidRight = 17.0f;
+            }
+            pose.pupilRadius = isLeft ? 15.0f : 11.0f;
+            break;
+        case Emotion::Excited:
+            pose.width = 70.0f;
+            pose.height = 78.0f;
+            pose.pupilRadius = 18.0f;
+            break;
+        case Emotion::Playful:
+            if (!isLeft) pose.lidLeft = 6.0f;
+            break;
+    }
+    return pose;
+}
+
+void FaceAnimator::updateTransition(uint32_t nowMs) {
+    if (!transitionActive_) {
+        visualEmotion_ = emotion_;
+        transitionOpenness_ = 1.0f;
+        return;
+    }
+
+    const uint32_t elapsed = nowMs - transitionStartedMs_;
+    if (elapsed >= kSpecialTransitionMs) {
+        transitionActive_ = false;
+        visualEmotion_ = emotion_;
+        transitionOpenness_ = 1.0f;
+        return;
+    }
+
+    const float phase = static_cast<float>(elapsed) / kSpecialTransitionMs;
+    if (phase < 0.5f) {
+        visualEmotion_ = transitionFrom_;
+        transitionOpenness_ = 1.0f - smoothStep(phase * 2.0f);
+    } else {
+        visualEmotion_ = emotion_;
+        transitionOpenness_ = smoothStep((phase - 0.5f) * 2.0f);
+        if (!transitionRevealed_) {
+            // The eyes are closed at this instant, so switching topology
+            // here is invisible. Continue opening using the destination pose.
+            for (uint8_t index = 0; index < 2; ++index) {
+                eyes_[index] = targetEyePose(emotion_, index == 0);
+            }
+            transitionRevealed_ = true;
+        }
+    }
+}
+
+void FaceAnimator::animateEyes() {
+    // Critically damped-looking interpolation without heap allocation.
+    // It remains continuous when button/Serial commands arrive rapidly.
+    for (uint8_t index = 0; index < 2; ++index) {
+        const EyePose target = targetEyePose(visualEmotion_, index == 0);
+        EyePose& eye = eyes_[index];
+        const float speed = 0.23f;
+        eye.width += (target.width - eye.width) * speed;
+        eye.height += (target.height - eye.height) * speed;
+        eye.openness += (target.openness - eye.openness) * speed;
+        eye.pupilRadius += (target.pupilRadius - eye.pupilRadius) * speed;
+        eye.lidLeft += (target.lidLeft - eye.lidLeft) * speed;
+        eye.lidRight += (target.lidRight - eye.lidRight) * speed;
+    }
 }
 
 void FaceAnimator::animateBrows() {
@@ -183,6 +322,7 @@ void FaceAnimator::update(uint32_t nowMs) {
     if (lastFrameMs_ != 0 && nowMs - lastFrameMs_ < kFrameIntervalMs) return;
     lastFrameMs_ = nowMs;
     animationNowMs_ = nowMs;
+    updateTransition(nowMs);
 
     if (!sleeping_ && deadlineReached(nowMs, nextLookMs_)) {
         targetGazeX_ = static_cast<float>(random(-13, 14));
@@ -208,13 +348,10 @@ void FaceAnimator::update(uint32_t nowMs) {
         }
     }
 
-    float openness = 1.0f;
-    if (sleeping_) openness = 0.055f;
-    else if (emotion_ == Emotion::Sleepy) openness = 0.38f;
-    else if (emotion_ == Emotion::Angry) openness = 0.83f;
-    else if (emotion_ == Emotion::Sad) openness = 0.78f;
-    openness *= 1.0f - blink * 0.94f;
+    const float openness = sleeping_ ? 0.055f
+        : (1.0f - blink * 0.94f) * transitionOpenness_;
     animateBrows();
+    animateEyes();
     render(clampFloat(openness, 0.04f, 1.0f));
 }
 
