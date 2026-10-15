@@ -1282,7 +1282,11 @@ void FaceAnimator::render(float openness) {
 
     canvas_.setCursor(10, height_ - 17);
     canvas_.print(sleeping_ ? "SLEEPING" : emotionName(emotion_));
-    canvas_.setCursor(width_ - 80, height_ - 17);
+    // Compact, unobtrusive affection meter; no score persisted to flash.
+    canvas_.setCursor(width_ - 114, height_ - 17);
+    canvas_.print("A:");
+    canvas_.print(affection_);
+    canvas_.setCursor(width_ - 45, height_ - 17);
     canvas_.print("v0.1");
 
     drawLifecycleOverlay();
