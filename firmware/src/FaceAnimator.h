@@ -6,6 +6,7 @@
 #include "Emotion.h"
 #include "IdleBehavior.h"
 #include "Personality.h"
+#include "FaceLifecycle.h"
 
 const char* emotionName(Emotion emotion);
 
@@ -21,7 +22,7 @@ public:
     void setEmotion(Emotion emotion, uint32_t nowMs);
     void nextEmotion(uint32_t nowMs);
     void setSleeping(bool sleeping, uint32_t nowMs);
-    bool isSleeping() const { return sleeping_; }
+    bool isSleeping() const { return lifecycle_.sleeping(); }
 
     // Comic quips are opt-in and never persisted by the firmware.
     void setSassEnabled(bool enabled, uint32_t nowMs);
@@ -46,6 +47,7 @@ private:
     void drawQuip();
     void drawIdleDetails(int eyeY);
     void drawParticles(float openness);
+    void drawLifecycleOverlay();
     float idleEnvelope() const;
     const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
@@ -98,6 +100,7 @@ private:
     float gazeX_ = 0.0f;
     float targetGazeX_ = 0.0f;
     bool blinking_ = false;
+    deskpet_lifecycle::Timeline lifecycle_;
     bool sleeping_ = false;
     bool ready_ = false;
     IdleGesture idleGesture_ = IdleGesture::None;
