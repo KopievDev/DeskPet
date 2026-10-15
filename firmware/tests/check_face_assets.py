@@ -149,5 +149,21 @@ assert "animationNowMs_ - emotionStartedMs_, strength, kBackground" in source
 assert "kLoveRed = 0xFA8D" in source
 assert (ROOT / "tests/fury_glow_test.cpp").is_file()
 
+particles = (ROOT / "include/EmotionParticles.h").read_text(encoding="utf-8")
+assert "constexpr uint8_t kParticleCount = 6;" in particles
+assert "inline Particle sample(Style style, uint32_t elapsedMs, uint8_t index)" in particles
+for emotion, style in (("Excited", "Sparks"), ("Love", "Hearts"),
+                       ("Furious", "Steam")):
+    assert f"case Emotion::{emotion}: return Style::{style};" in particles
+assert "opacity" in particles and "kCycleMs = 2400u;" in particles
+assert '#include "EmotionParticles.h"' in source
+assert "void FaceAnimator::drawParticles(float openness)" in source
+assert "drawParticles(openness);" in source
+assert "if (sleeping_ || openness <= 0.12f) return;" in source
+assert "deskpet_particles::sample(style, elapsed, index)" in source
+assert "kHeartPixels[6]" in source
+assert "canvas_.drawLine(x - 2, y + 3, x + 1, y + 1, color)" in source
+assert (ROOT / "tests/emotion_particles_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
