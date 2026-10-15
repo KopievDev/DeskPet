@@ -103,6 +103,43 @@ int main() {
     reactions.nextEmotion(5030);
     checkMood(reactions, Emotion::Neutral);
 
+    // USER hold "pet" shows Love briefly, then restores the manual
+    // mood, without altering the user's selection.
+    reactions.begin(6000u);
+    reactions.chooseEmotion(Emotion::Angry, 6050u);
+    checkMood(reactions, Emotion::Angry);
+    reactions.showTemporary(Emotion::Love, 6100u, 3200u);
+    checkMood(reactions, Emotion::Love);
+    assert(reactions.manualEmotion() == Emotion::Angry);
+    reactions.tick(9299u);
+    assert(!reactions.takeChange(unused));
+    reactions.tick(9300u);
+    checkMood(reactions, Emotion::Angry);
+
+    // USER double-tap shows a transient Surprised; another manual
+    // action cancels it immediately.
+    reactions.showTemporary(Emotion::Surprised, 9500u, 2300u);
+    checkMood(reactions, Emotion::Surprised);
+    reactions.chooseEmotion(Emotion::Happy, 9800u);
+    checkMood(reactions, Emotion::Happy);
+    reactions.tick(12000u);
+    assert(!reactions.takeChange(unused));
+
+    // Consecutive temporary reactions replace one another safely.
+    reactions.showTemporary(Emotion::Love, 14000u, 3200u);
+    checkMood(reactions, Emotion::Love);
+    reactions.showTemporary(Emotion::Surprised, 14200u, 2300u);
+    checkMood(reactions, Emotion::Surprised);
+    reactions.tick(16500u);
+    checkMood(reactions, Emotion::Happy);
+
+    // A transient event does not change the manual emotion even if its
+    // visual mood already matches the saved baseline.
+    reactions.showTemporary(Emotion::Happy, 18000u, 3200u);
+    assert(!reactions.takeChange(unused));
+    reactions.tick(21200u);
+    assert(!reactions.takeChange(unused));
+
     puts("PASS: build/idle reaction scheduling, manual priority, no repeats, wrap-around");
     return 0;
 }
