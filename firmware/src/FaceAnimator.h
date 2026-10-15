@@ -9,6 +9,12 @@ enum class Emotion : uint8_t {
     Curious,
     Surprised,
     Sleepy,
+    Angry,
+    Sad,
+    Love,
+    Confused,
+    Excited,
+    Playful,
     Count
 };
 
@@ -54,6 +60,8 @@ private:
     uint32_t nextBlinkMs_ = 0;
     uint32_t blinkStartedMs_ = 0;
     uint32_t nextLookMs_ = 0;
+    uint32_t emotionStartedMs_ = 0;
+    uint32_t animationNowMs_ = 0;
     float gazeX_ = 0.0f;
     float targetGazeX_ = 0.0f;
     bool blinking_ = false;
