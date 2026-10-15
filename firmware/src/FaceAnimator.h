@@ -30,8 +30,19 @@ public:
 
 private:
     void render(float openness);
-    void drawEye(int centerX, int centerY, float openness);
+    void drawEye(int centerX, int centerY, float openness, bool isLeft);
+    void drawBrow(int centerX, uint8_t index, uint16_t color);
+    void drawClosedEye(int centerX, int centerY, float openness);
+    void animateBrows();
     static bool deadlineReached(uint32_t nowMs, uint32_t deadlineMs);
+
+    struct BrowState {
+        float y = 40.0f;
+        float slope = 0.0f;
+        float arch = 4.0f;
+    };
+
+    BrowState brows_[2]; // independent, smoothly animated left/right eyebrows
 
     lgfx::LGFX_Device& display_;
     lgfx::LGFX_Sprite canvas_;
