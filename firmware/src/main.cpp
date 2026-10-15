@@ -5,6 +5,7 @@
 #include "DeskPetTDisplayS3.h"
 #include "FaceAnimator.h"
 #include "ReactionController.h"
+#include "IdleBehavior.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -15,6 +16,7 @@ constexpr uint32_t kDemoIntervalMs = 1800;
 DeskPetTDisplayS3 display;
 FaceAnimator face(display);
 ReactionController reactions;
+IdleBehavior ambient;
 
 struct Button {
     explicit Button(uint8_t gpio) : pin(gpio) {}
@@ -81,11 +83,17 @@ size_t commandLength = 0;
 bool demoEnabled = false;
 uint32_t nextDemoMs = 0;
 
+void cancelAmbient(uint32_t nowMs) {
+    ambient.reset(nowMs);
+    face.setIdleGesture(IdleGesture::None, nowMs);
+}
+
 void syncReaction(uint32_t nowMs) {
     // Do not consume queued UI changes while asleep: apply on wake.
     if (face.isSleeping()) return;
     Emotion next;
     if (reactions.takeChange(next)) {
+        cancelAmbient(nowMs);
         face.setEmotion(next, nowMs);
     }
 }
@@ -102,6 +110,10 @@ void showStatus() {
     Serial.print(demoEnabled ? "on" : "off");
     Serial.print(" | sass: ");
     Serial.print(face.sassEnabled() ? "on" : "off");
+    Serial.print(" | ambient: ");
+    Serial.print(ambient.enabled() ? "on" : "off");
+    Serial.print(" | gesture: ");
+    Serial.print(static_cast<int>(ambient.gesture()));
     Serial.print(" | sleeping: ");
     Serial.println(face.isSleeping() ? "yes" : "no");
 }
@@ -109,7 +121,7 @@ void showStatus() {
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered");
-        Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip");
+        Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
         Serial.println("Reactions: event build-success | event build-failure | idle on | idle off | idle <15..3600 seconds> | status");
         return;
     }
@@ -119,6 +131,14 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "status") == 0) {
         showStatus();
+        return;
+    }
+    if (strcmp(command, "ambient on") == 0 ||
+        strcmp(command, "ambient off") == 0) {
+        ambient.setEnabled(strcmp(command, "ambient on") == 0, nowMs);
+        face.setIdleGesture(IdleGesture::None, nowMs);
+        Serial.println(ambient.enabled() ? "Ambient gestures ON" :
+                                            "Ambient gestures OFF");
         return;
     }
     if (strcmp(command, "sass on") == 0 || strcmp(command, "sass off") == 0) {
@@ -135,6 +155,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "demo on") == 0) {
+        cancelAmbient(nowMs);
         demoEnabled = true;
         reactions.chooseEmotion(Emotion::Neutral, nowMs);
         if (face.isSleeping()) face.setSleeping(false, nowMs);
@@ -144,6 +165,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "demo off") == 0) {
+        cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.activity(nowMs);
         syncReaction(nowMs);
@@ -175,6 +197,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "sleep") == 0 || strcmp(command, "wake") == 0) {
+        cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.activity(nowMs);
         if (strcmp(command, "sleep") == 0) {
@@ -194,6 +217,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
             Serial.println("Event ignored while DeskPet is sleeping");
             return;
         }
+        cancelAmbient(nowMs);
         demoEnabled = false;
         const bool success = strcmp(command, "event build-success") == 0;
         reactions.buildResult(success, nowMs);
@@ -204,6 +228,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "next") == 0) {
+        cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.nextEmotion(nowMs);
         if (face.isSleeping()) face.setSleeping(false, nowMs);
@@ -214,6 +239,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     for (const auto& item : kEmotionCommands) {
         if (strcmp(command, item.command) == 0) {
+            cancelAmbient(nowMs);
             demoEnabled = false;
             reactions.chooseEmotion(item.emotion, nowMs);
             if (face.isSleeping()) face.setSleeping(false, nowMs);
@@ -259,18 +285,22 @@ void setup() {
         Serial.println("Could not allocate face sprite (check PSRAM)");
         return;
     }
-    reactions.begin(millis());
+    const uint32_t startedAt = millis();
+    reactions.begin(startedAt);
+    ambient.begin(startedAt, static_cast<uint32_t>(esp_random()));
     Serial.println("DeskPet 0.1 ready. Type help.");
 }
 
 void loop() {
     const uint32_t now = millis();
     if (userButton.pressed(now)) {
+        cancelAmbient(now);
         demoEnabled = false;
         reactions.nextEmotion(now);
         syncReaction(now);
     }
     if (bootButton.pressed(now)) {
+        cancelAmbient(now);
         demoEnabled = false;
         reactions.activity(now);
         if (face.isSleeping()) {
@@ -292,6 +322,14 @@ void loop() {
         reactions.tick(now);
         syncReaction(now);
     }
+    const bool allowAmbient = !demoEnabled && !face.isSleeping() &&
+        !reactions.reactionActive() && !reactions.idleActive() &&
+        reactions.desiredEmotion() == Emotion::Neutral &&
+        reactions.manualEmotion() == Emotion::Neutral;
+    if (ambient.tick(now, allowAmbient)) {
+        face.setIdleGesture(ambient.gesture(), ambient.startedMs());
+    }
+
     face.update(now);
     delay(1);
 }
