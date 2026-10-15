@@ -1082,11 +1082,16 @@ void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
             canvas_.fillRect(mid - 13 + tooth * 7 + shake,
                              eyeY + 29 + tooth % 2, 6, 7, kEye);
         }
-        const int sweatX = mid + 117;
-        const int sweatY = eyeY - 18 + skit.sweatDrop;
-        canvas_.fillCircle(sweatX, sweatY + 6, 5, 0x9E7F);
-        canvas_.fillTriangle(sweatX, sweatY - 4, sweatX - 5, sweatY + 6,
-                             sweatX + 5, sweatY + 6, 0x9E7F);
+        if (skit.sweatAlpha > 12u) {
+            const int sweatX = mid + 117;
+            const int sweatY = eyeY - 18 + skit.sweatDrop;
+            const uint16_t sweat = deskpet_mood::blend565(
+                kBackground, 0x9E7F, skit.sweatAlpha);
+            canvas_.fillCircle(sweatX, sweatY + 6, 5, sweat);
+            canvas_.fillTriangle(sweatX, sweatY - 4,
+                                 sweatX - 5, sweatY + 6,
+                                 sweatX + 5, sweatY + 6, sweat);
+        }
     }
 }
 
