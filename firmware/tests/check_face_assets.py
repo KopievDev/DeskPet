@@ -104,5 +104,16 @@ assert "face.setPersonality(next, nowMs);" in serial
 assert 'Serial.print(personalityName(ambient.personality()))' in serial
 assert (ROOT / "tests/personality_test.cpp").is_file()
 
+heart = (ROOT / "include/HeartShape.h").read_text(encoding="utf-8")
+assert "constexpr Row kRows[]" in heart, "Heart silhouette table missing"
+assert "template <typename DrawRect>" in heart
+assert "void FaceAnimator::drawHeartEye(int centerX, int centerY, float openness)" in source
+assert "drawHeartEye(centerX, centerY + 1, eyeOpen);" in source
+assert 'kLoveRed = 0xFA8D' in source, "Love must use coral-red RGB565 #FF5268"
+assert 'kLoveHighlight = 0xFE7B' in source
+assert "canvas_.fillRect(x, y, w, h, kLoveRed);" in source
+assert "visualEmotion_ == Emotion::Love ? kLoveRed : kAccent" in source
+assert (ROOT / "tests/heart_shape_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
