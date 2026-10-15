@@ -41,6 +41,7 @@ private:
     void drawHeartEye(int centerX, int centerY, float openness);
     void animateBrows();
     void animateEyes();
+    void animateMoodColors();
     void updateTransition(uint32_t nowMs);
     void drawQuip();
     void drawIdleDetails(int eyeY);
@@ -89,6 +90,10 @@ private:
     bool transitionActive_ = false;
     bool transitionRevealed_ = false;
     uint32_t animationNowMs_ = 0;
+    float angerTint_ = 0.0f;
+    float furyTint_ = 0.0f;
+    uint16_t eyeFill_ = 0xDFFF;
+    uint16_t pupilFill_ = 0x0882;
     float gazeX_ = 0.0f;
     float targetGazeX_ = 0.0f;
     bool blinking_ = false;
