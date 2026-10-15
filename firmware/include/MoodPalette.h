@@ -14,7 +14,7 @@ constexpr uint16_t kAngryEye = 0xFE91;     // #FFD18B - warm amber
 constexpr uint16_t kAngryPupil = 0x4122;   // #422617 - deep brown
 constexpr uint16_t kAngryBrow = 0xFCC6;    // #FF9A36 - vivid orange
 
-constexpr uint16_t kFuriousEye = 0xFA8C;   // #FF5166 - hot red/coral
+constexpr uint16_t kFuriousEye = 0xF9CA;   // #FF3B55 - deep scarlet, distinct from Love
 constexpr uint16_t kFuriousPupil = 0x4044; // #410B20 - deep burgundy
 constexpr uint16_t kFuriousBrow = 0xF929;  // #FF244A - crimson
 constexpr uint16_t kFuriousSpark = 0xFEAB; // #FFD45C - golden lightning
