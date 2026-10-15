@@ -194,5 +194,31 @@ assert 'canvas_.print("Z");' in source
 assert 'canvas_.print("HI!");' in source
 assert (ROOT / "tests/face_lifecycle_test.cpp").is_file()
 
+gestures = (ROOT / "include/ButtonGesture.h").read_text(encoding="utf-8")
+assert "enum class Action" in gestures
+for action in ("Tap", "DoubleTap", "Hold"):
+    assert action in gestures
+assert "kDebounceMs = 35u" in gestures
+assert "kHoldMs = 850u" in gestures
+assert "kDoubleTapMs = 320u" in gestures
+assert "longFired_ = pressed;" in gestures, "BOOT hold during reset must not fire"
+assert "pendingTap_ = false; // holding never triggers a short tap" in gestures
+assert "Action poll(bool pressed, uint32_t nowMs)" in gestures
+assert '#include "ButtonGesture.h"' in serial
+assert "deskpet_button::Gesture userButton(true);" in serial
+assert "deskpet_button::Gesture bootButton(false);" in serial
+assert "void handleUserGesture(deskpet_button::Action action" in serial
+assert "void handleBootGesture(deskpet_button::Action action" in serial
+assert "reactions.showTemporary(Emotion::Love, nowMs, kPetDurationMs)" in serial
+assert "reactions.showTemporary(Emotion::Surprised, nowMs, kSurpriseDurationMs)" in serial
+assert "face.setSleeping(true, nowMs)" in serial
+assert "face.setSleeping(false, nowMs)" in serial
+assert "ambient.setPersonality(next, nowMs)" in serial
+assert "face.setPersonality(next, nowMs)" in serial
+assert "static constexpr uint32_t kReactionDurationMs = 4500" in reaction
+assert "void showTemporary(Emotion emotion" in reaction
+assert "reactionDurationMs_" in reaction
+assert (ROOT / "tests/button_gesture_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
