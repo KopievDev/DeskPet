@@ -7,6 +7,7 @@
 #include "IdleBehavior.h"
 #include "Personality.h"
 #include "FaceLifecycle.h"
+#include "PetNeeds.h"
 
 const char* emotionName(Emotion emotion);
 
@@ -34,6 +35,12 @@ public:
     void setPersonality(Personality personality, uint32_t nowMs);
     Personality personality() const { return personality_; }
     void setAffection(uint8_t score) { affection_ = score; }
+    void setNeeds(uint8_t energy, uint8_t mood, uint8_t attention) {
+        energy_ = energy;
+        mood_ = mood;
+        attention_ = attention;
+    }
+    void setNeedPrompt(deskpet_needs::Kind prompt) { needPrompt_ = prompt; }
 
     // Ambient gestures are visual-only: never replace the user's emotion.
     void setIdleGesture(IdleGesture gesture, uint32_t startedMs);
@@ -53,6 +60,7 @@ private:
     void drawParticles(float openness);
     void drawLifecycleOverlay();
     void drawComicFeatures(int eyeY, float openness);
+    void drawNeedPrompt(int eyeY, float openness);
     float idleEnvelope() const;
     const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
@@ -112,6 +120,10 @@ private:
     uint32_t idleStartedMs_ = 0;
     Personality personality_ = Personality::Calm;
     uint8_t affection_ = 50u;
+    uint8_t energy_ = 78u;
+    uint8_t mood_ = 70u;
+    uint8_t attention_ = 65u;
+    deskpet_needs::Kind needPrompt_ = deskpet_needs::Kind::None;
     bool sassEnabled_ = false;
     bool quipVisible_ = false;
     uint32_t quipStartedMs_ = 0;
