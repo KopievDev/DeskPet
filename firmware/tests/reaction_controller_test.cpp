@@ -94,6 +94,15 @@ int main() {
     reactions.nextEmotion(4400);
     checkMood(reactions, Emotion::Embarrassed);
 
+    // USER/demo must include Bewildered and wrap from the last emotion.
+    reactions.begin(5000);
+    reactions.chooseEmotion(Emotion::Bored, 5010);
+    checkMood(reactions, Emotion::Bored);
+    reactions.nextEmotion(5020);
+    checkMood(reactions, Emotion::Bewildered);
+    reactions.nextEmotion(5030);
+    checkMood(reactions, Emotion::Neutral);
+
     puts("PASS: build/idle reaction scheduling, manual priority, no repeats, wrap-around");
     return 0;
 }
