@@ -23,6 +23,17 @@ constexpr uint32_t kSleepDurationMs = 850u;
 constexpr uint32_t kWakeDurationMs = 1050u;
 constexpr float kClosedOpenness = 0.055f;
 
+inline const char* phaseName(Phase phase) {
+    switch (phase) {
+        case Phase::Booting: return "BOOTING";
+        case Phase::Awake: return "AWAKE";
+        case Phase::FallingAsleep: return "FALLING_ASLEEP";
+        case Phase::Asleep: return "ASLEEP";
+        case Phase::Waking: return "WAKING";
+    }
+    return "UNKNOWN";
+}
+
 inline float clamp01(float x) {
     return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
 }
