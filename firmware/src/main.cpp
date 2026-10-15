@@ -81,8 +81,10 @@ bool demoEnabled = false;
 uint32_t nextDemoMs = 0;
 
 void syncReaction(uint32_t nowMs) {
+    // Do not consume queued UI changes while asleep: apply on wake.
+    if (face.isSleeping()) return;
     Emotion next;
-    if (reactions.takeChange(next) && !face.isSleeping()) {
+    if (reactions.takeChange(next)) {
         face.setEmotion(next, nowMs);
     }
 }
@@ -134,6 +136,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "demo on") == 0) {
         demoEnabled = true;
         reactions.chooseEmotion(Emotion::Neutral, nowMs);
+        if (face.isSleeping()) face.setSleeping(false, nowMs);
         syncReaction(nowMs);
         nextDemoMs = nowMs + kDemoIntervalMs;
         Serial.println("Demo ON: cycling all 16 emotions");
@@ -202,6 +205,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "next") == 0) {
         demoEnabled = false;
         reactions.nextEmotion(nowMs);
+        if (face.isSleeping()) face.setSleeping(false, nowMs);
         syncReaction(nowMs);
         Serial.print("Mood: ");
         Serial.println(emotionName(reactions.manualEmotion()));
@@ -211,6 +215,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         if (strcmp(command, item.command) == 0) {
             demoEnabled = false;
             reactions.chooseEmotion(item.emotion, nowMs);
+            if (face.isSleeping()) face.setSleeping(false, nowMs);
             syncReaction(nowMs);
             Serial.print("Mood: ");
             Serial.println(emotionName(reactions.manualEmotion()));
