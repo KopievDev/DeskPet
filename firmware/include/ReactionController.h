@@ -51,12 +51,23 @@ public:
         setDesired(manual_);
     }
 
-    void buildResult(bool success, uint32_t nowMs) {
+    // Temporary expressions never replace the manually selected mood.
+    // Restarting an active reaction extends its lifetime and cannot
+    // interrupt Sleep by itself (the caller enforces sleep priority).
+    void showTemporary(Emotion emotion, uint32_t nowMs, uint32_t durationMs) {
+        if (emotion == Emotion::Count) return;
         lastActivityMs_ = nowMs;
         idleActive_ = false;
         reactionActive_ = true;
         reactionStartedMs_ = nowMs;
-        setDesired(success ? Emotion::Excited : Emotion::Furious);
+        reactionDurationMs_ = durationMs < 250u ? 250u
+                            : (durationMs > 10000u ? 10000u : durationMs);
+        setDesired(emotion);
+    }
+
+    void buildResult(bool success, uint32_t nowMs) {
+        showTemporary(success ? Emotion::Excited : Emotion::Furious,
+                      nowMs, kReactionDurationMs);
     }
 
     void setIdleEnabled(bool enabled, uint32_t nowMs) {
@@ -73,7 +84,7 @@ public:
 
     void tick(uint32_t nowMs) {
         if (reactionActive_ &&
-            static_cast<uint32_t>(nowMs - reactionStartedMs_) >= kReactionDurationMs) {
+            static_cast<uint32_t>(nowMs - reactionStartedMs_) >= reactionDurationMs_) {
             reactionActive_ = false;
             setDesired(manual_);
         }
@@ -106,6 +117,7 @@ private:
     Emotion lastEmitted_ = Emotion::Neutral;
     uint32_t lastActivityMs_ = 0;
     uint32_t reactionStartedMs_ = 0;
+    uint32_t reactionDurationMs_ = kReactionDurationMs;
     uint32_t idleSeconds_ = kDefaultIdleSeconds;
     bool idleEnabled_ = true;
     bool idleActive_ = false;
