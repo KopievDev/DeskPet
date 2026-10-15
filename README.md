@@ -4,7 +4,7 @@
 
 ## Статус
 
-**Firmware 0.1 — первый прототип.** Работает без Wi-Fi, API-ключей, дополнительных плат и датчиков. Показывает анимированные глаза, моргает, меняет направление взгляда и реагирует на кнопки. Сборка и работа на физической плате требуют локальной проверки.
+**Firmware 0.1 — первый прототип.** Работает без Wi-Fi, API-ключей, дополнительных плат и датчиков. Показывает анимированные глаза, моргает, меняет направление взгляда и реагирует на кнопки. Первый лог локальной сборки обнаружил несовместимость исходного заголовка LILYGO с LovyanGFX 1.2.33; драйвер исправлен в проекте, **повторная сборка и работа на физической плате пока не подтверждены**.
 
 > Этот профиль рассчитан на **обычную T-Display-S3 с TFT LCD**, не Touch, AMOLED или Pro. Для других ревизий потребуется отдельный display profile.
 
@@ -46,6 +46,18 @@ python3 -m venv ~/.venvs/platformio
 ~/.venvs/platformio/bin/pio run -d firmware -e tdisplay_s3
 ```
 
+## Повторная сборка после исправления дисплея
+
+Если при первой сборке возникла ошибка `Bus_Parallel8::config_t has no member named i2s_port`, обновите ветку и пересоберите проект. В DeskPet используется собственный адаптер дисплея, сохраняющий **оригинальные пины LILYGO**, и зафиксирован `LovyanGFX 1.2.33`.
+
+```bash
+git pull --ff-only
+pio run -d firmware -e tdisplay_s3 -t clean
+pio run -d firmware -e tdisplay_s3
+```
+
+Не нужно менять `cfg.i2s_port` вручную в каталоге `.pio/` — временное изменение пропадёт при следующей установке зависимостей.
+
 ## Управление
 
 | Действие | Результат |
@@ -58,13 +70,13 @@ python3 -m venv ~/.venvs/platformio
 
 ## Устройство проекта
 
-- `firmware/` — PlatformIO + Arduino framework + официальный display profile LILYGO (LovyanGFX), персонаж и управление.
+- `firmware/` — PlatformIO + Arduino framework + совместимый адаптер ST7789 из `firmware/include/DeskPetTDisplayS3.h` поверх LovyanGFX 1.2.33 (пины из официального профиля LILYGO), персонаж и управление.
 - `docs/ARCHITECTURE.md` — границы ответственности устройства, приложений и AI Gateway.
 - `docs/ROADMAP.md` — поэтапная разработка.
 
 Первые версии принципиально не нуждаются в интернете. API-ключи AI не будут храниться в прошивке ESP32. После аппаратной проверки добавим Wi-Fi, локальное сопряжение и macOS-клиент.
 
-Источники по плате: [официальная документация](https://wiki.lilygo.cc/products/t-display-series/t-display-s3/) и [LILYGO display library](https://github.com/Xinyuan-LILYGO/LilyGo-display-library).
+Источники по плате: [официальная документация](https://wiki.lilygo.cc/products/t-display-series/t-display-s3/) и [LILYGO display library](https://github.com/Xinyuan-LILYGO/LilyGo-display-library) (источник исходной распиновки), [LovyanGFX](https://github.com/lovyan03/LovyanGFX) (графический движок).
 
 ## Электрическая схема прототипа
 
