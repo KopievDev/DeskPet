@@ -23,6 +23,12 @@ const char* emotionName(Emotion emotion) {
         case Emotion::Curious: return "CURIOUS";
         case Emotion::Surprised: return "SURPRISED";
         case Emotion::Sleepy: return "SLEEPY";
+        case Emotion::Angry: return "ANGRY";
+        case Emotion::Sad: return "SAD";
+        case Emotion::Love: return "LOVE";
+        case Emotion::Confused: return "CONFUSED";
+        case Emotion::Excited: return "EXCITED";
+        case Emotion::Playful: return "PLAYFUL";
         case Emotion::Count: break;
     }
     return "UNKNOWN";
@@ -43,6 +49,8 @@ bool FaceAnimator::begin() {
     }
 
     const uint32_t now = millis();
+    emotionStartedMs_ = now;
+    animationNowMs_ = now;
     nextBlinkMs_ = now + 1800;
     nextLookMs_ = now + 1200;
     render(1.0f);
@@ -56,6 +64,7 @@ bool FaceAnimator::deadlineReached(uint32_t nowMs, uint32_t deadlineMs) {
 void FaceAnimator::setEmotion(Emotion emotion, uint32_t nowMs) {
     if (emotion == Emotion::Count) return;
     emotion_ = emotion;
+    emotionStartedMs_ = nowMs;
     sleeping_ = false;
     blinking_ = false;
     nextBlinkMs_ = nowMs + 1300;
@@ -114,6 +123,46 @@ void FaceAnimator::animateBrows() {
                 slope[1] = -4.0f;
                 arch[0] = arch[1] = 1.0f;
                 break;
+            case Emotion::Angry:
+                y[0] = y[1] = 48.0f;
+                slope[0] = 11.0f;  // brow tips slope toward the nose
+                slope[1] = -11.0f;
+                arch[0] = arch[1] = 1.0f;
+                break;
+            case Emotion::Sad:
+                y[0] = y[1] = 45.0f;
+                slope[0] = -8.0f;  // raised inner corners
+                slope[1] = 8.0f;
+                arch[0] = arch[1] = -3.0f;
+                break;
+            case Emotion::Love:
+                y[0] = y[1] = 41.0f;
+                slope[0] = -3.0f;
+                slope[1] = 3.0f;
+                arch[0] = arch[1] = 9.0f;
+                break;
+            case Emotion::Confused:
+                y[0] = 35.0f;
+                y[1] = 53.0f;
+                slope[0] = -9.0f;
+                slope[1] = -4.0f;
+                arch[0] = 5.0f;
+                arch[1] = 0.0f;
+                break;
+            case Emotion::Excited:
+                y[0] = y[1] = 32.0f;
+                slope[0] = -4.0f;
+                slope[1] = 4.0f;
+                arch[0] = arch[1] = 8.0f;
+                break;
+            case Emotion::Playful:
+                y[0] = 51.0f;
+                y[1] = 39.0f;
+                slope[0] = 6.0f;
+                slope[1] = 4.0f;
+                arch[0] = 2.0f;
+                arch[1] = 6.0f;
+                break;
             case Emotion::Neutral:
             case Emotion::Count:
                 break;
@@ -133,6 +182,7 @@ void FaceAnimator::update(uint32_t nowMs) {
     if (!ready_) return;
     if (lastFrameMs_ != 0 && nowMs - lastFrameMs_ < kFrameIntervalMs) return;
     lastFrameMs_ = nowMs;
+    animationNowMs_ = nowMs;
 
     if (!sleeping_ && deadlineReached(nowMs, nextLookMs_)) {
         targetGazeX_ = static_cast<float>(random(-13, 14));
@@ -161,6 +211,8 @@ void FaceAnimator::update(uint32_t nowMs) {
     float openness = 1.0f;
     if (sleeping_) openness = 0.055f;
     else if (emotion_ == Emotion::Sleepy) openness = 0.38f;
+    else if (emotion_ == Emotion::Angry) openness = 0.83f;
+    else if (emotion_ == Emotion::Sad) openness = 0.78f;
     openness *= 1.0f - blink * 0.94f;
     animateBrows();
     render(clampFloat(openness, 0.04f, 1.0f));
@@ -176,22 +228,43 @@ void FaceAnimator::drawClosedEye(int centerX, int centerY) {
 }
 
 void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft) {
+    // All expressive shapes flatten to a simple lid during a full blink.
     if (sleeping_ || openness < 0.14f) {
         drawClosedEye(centerX, centerY);
         return;
     }
 
     if (emotion_ == Emotion::Happy) {
-        // Smiling eyes are smooth upside-down U arcs (not hollow rectangles).
-        // Scale the curvature with blink openness so the arc gently flattens
-        // instead of snapping into an unrelated rectangle while blinking.
-        const int span = 30;
-        const int stroke = 6;
-        for (int dx = -span; dx <= span; dx += 2) {
-            const float t = static_cast<float>(dx) / span;
-            const float arcY = -15.0f + 23.0f * t * t;
-            const int y = centerY + static_cast<int>(arcY * openness);
-            canvas_.fillCircle(centerX + dx, y, stroke, kEye);
+        // Smooth, upward smiling eyelids, instead of hollow rectangles.
+        constexpr int kSpan = 30;
+        for (int dx = -kSpan; dx <= kSpan; dx += 2) {
+            const float t = static_cast<float>(dx) / kSpan;
+            const int y = centerY + static_cast<int>((-15.0f + 23.0f * t * t) * openness);
+            canvas_.fillCircle(centerX + dx, y, 6, kEye);
+        }
+        return;
+    }
+
+    if (emotion_ == Emotion::Love) {
+        // Pulsing heart eyes. Keep the entire silhouette inside 320x170.
+        const float beat = sinf(static_cast<float>(animationNowMs_ - emotionStartedMs_) *
+                                0.006f);
+        const int radius = 14 + static_cast<int>(1.5f * (1.0f + beat));
+        const int topY = centerY - 10;
+        canvas_.fillCircle(centerX - 13, topY, radius, kAccent);
+        canvas_.fillCircle(centerX + 13, topY, radius, kAccent);
+        canvas_.fillTriangle(centerX - 28, topY - 3,
+                             centerX + 28, topY - 3,
+                             centerX, centerY + 31, kAccent);
+        return;
+    }
+
+    if (emotion_ == Emotion::Playful && isLeft) {
+        // The left eye stays in a crooked wink, the right looks at the user.
+        for (int dx = -28; dx <= 28; dx += 2) {
+            const float t = static_cast<float>(dx) / 28.0f;
+            const int y = centerY + 5 + static_cast<int>(5.0f * t * t + 3.0f * t);
+            canvas_.fillCircle(centerX + dx, y, 4, kEye);
         }
         return;
     }
@@ -199,50 +272,86 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool surprised = emotion_ == Emotion::Surprised;
     const bool curious = emotion_ == Emotion::Curious;
     const bool sleepy = emotion_ == Emotion::Sleepy;
+    const bool angry = emotion_ == Emotion::Angry;
+    const bool sad = emotion_ == Emotion::Sad;
+    const bool confused = emotion_ == Emotion::Confused;
+    const bool excited = emotion_ == Emotion::Excited;
+    const bool playful = emotion_ == Emotion::Playful;
 
-    // Curious eyes react differently to their brows: one wide and alert,
-    // the other slightly narrowed by the upper lid.
-    const float asymmetricOpen = curious && !isLeft ? 0.79f : 1.0f;
-    const int eyeW = surprised ? 66 : 72;
-    const int fullHeight = surprised ? 79 : 74;
+    float asymmetricOpen = curious && !isLeft ? 0.79f : 1.0f;
+    if (confused && !isLeft) asymmetricOpen = 0.61f;
+    if (sad) asymmetricOpen = isLeft ? 0.88f : 0.95f;
+
+    const int eyeW = surprised ? 66 : (excited ? 70 : 72);
+    const int fullHeight = surprised ? 79 : (excited ? 78 : 74);
     const int eyeH = static_cast<int>(fullHeight * openness * asymmetricOpen);
     const int visibleH = eyeH < 6 ? 6 : eyeH;
+    const int bounce = excited
+        ? static_cast<int>(2.5f * sinf(static_cast<float>(animationNowMs_ - emotionStartedMs_) * 0.011f))
+        : 0;
     const int left = centerX - eyeW / 2;
-    const int top = centerY - visibleH / 2;
+    const int top = centerY - visibleH / 2 + bounce;
     const int radius = visibleH / 2 < eyeW / 2
                            ? visibleH / 2 : eyeW / 2;
 
     canvas_.fillRoundRect(left, top, eyeW, visibleH, radius, kEye);
 
-    // A half-closed sleepy eye reads as an eyelid, not as a tiny iris.
+    // No floating pupil inside a narrow drowsy eyelid.
     if (!sleepy && visibleH >= 24) {
-        const int pupilX = centerX + static_cast<int>(gazeX_);
-        const int pupilY = centerY + (curious ? -2 : 3);
-        const int pupilRadius = surprised ? 12 : 15;
+        int pupilRadius = 15;
+        if (surprised) pupilRadius = 21;  // deliberately much larger than neutral
+        if (angry) pupilRadius = 12;
+        if (confused) pupilRadius = isLeft ? 15 : 11;
+        if (excited) pupilRadius = 18;
+        const int lookOffset = confused ? (isLeft ? -8 : 7) : static_cast<int>(gazeX_);
+        const int pupilX = centerX + lookOffset;
+        const int pupilY = centerY + bounce + ((curious || sad) ? -2 : 3);
         canvas_.fillCircle(pupilX, pupilY, pupilRadius, kPupil);
-        canvas_.fillCircle(pupilX - 5, pupilY - 6, 4, kEye);
+        canvas_.fillCircle(pupilX - 5, pupilY - 6, surprised ? 6 : 4, kEye);
+        if (excited) {
+            canvas_.fillCircle(pupilX + 7, pupilY + 8, 2, kEye);
+        }
     }
 
-    if (curious && visibleH > 25) {
-        // Remove a small diagonal wedge from the upper edge to make the
-        // upper eyelid follow the lowered eyebrow on the right.
+    // Emotion-specific upper lids. Triangular background masks never
+    // touch neighboring eyes or the status text.
+    if ((curious || confused) && visibleH > 25) {
         if (isLeft) {
             canvas_.fillTriangle(left, top, left + eyeW, top,
                                  left, top + 6, kBackground);
         } else {
             canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left + eyeW, top + 12, kBackground);
+                                 left + eyeW, top + (confused ? 17 : 12), kBackground);
         }
     } else if (sleepy && visibleH > 14) {
-        // The softly sloped upper eyelids also echo the drooping brows.
-        const int wedge = 9;
         if (isLeft) {
             canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left, top + wedge, kBackground);
+                                 left, top + 9, kBackground);
         } else {
             canvas_.fillTriangle(left, top, left + eyeW, top,
-                                 left + eyeW, top + wedge, kBackground);
+                                 left + eyeW, top + 9, kBackground);
         }
+    } else if (angry && visibleH > 25) {
+        // Inner edges drop down, making a recognizable angry / shape.
+        if (isLeft) {
+            canvas_.fillTriangle(left, top, left + eyeW, top,
+                                 left + eyeW, top + 23, kBackground);
+        } else {
+            canvas_.fillTriangle(left, top, left + eyeW, top,
+                                 left, top + 23, kBackground);
+        }
+    } else if (sad && visibleH > 25) {
+        // Opposite of angry: inner corners lift, outer corners droop.
+        if (isLeft) {
+            canvas_.fillTriangle(left, top, left + eyeW, top,
+                                 left, top + 13, kBackground);
+        } else {
+            canvas_.fillTriangle(left, top, left + eyeW, top,
+                                 left + eyeW, top + 13, kBackground);
+        }
+    } else if (playful && visibleH > 25) {
+        canvas_.fillTriangle(left, top, left + eyeW, top,
+                             left, top + 6, kBackground);
     }
 }
 
@@ -264,28 +373,45 @@ void FaceAnimator::drawBrow(int centerX, uint8_t index, uint16_t color) {
 void FaceAnimator::render(float openness) {
     canvas_.fillScreen(kBackground);
 
-    // Move the eyes slightly down: a dedicated brow band is now visible
-    // between the top status line and the eyes on a 320x170 IPS display.
     const int eyeY = height_ / 2 + 10;
     const int leftEyeX = width_ / 2 - 62;
     const int rightEyeX = width_ / 2 + 62;
     drawEye(leftEyeX, eyeY, openness, true);
     drawEye(rightEyeX, eyeY, openness, false);
 
-    const bool expressive = emotion_ == Emotion::Happy ||
-                            emotion_ == Emotion::Surprised ||
-                            emotion_ == Emotion::Curious;
-    const uint16_t browColor = expressive && !sleeping_ ? kAccent : kMuted;
+    const bool expressive = emotion_ != Emotion::Neutral &&
+                            emotion_ != Emotion::Sleepy && !sleeping_;
+    const uint16_t browColor = expressive ? kAccent : kMuted;
     drawBrow(leftEyeX, 0, browColor);
     drawBrow(rightEyeX, 1, browColor);
 
-    // Small accents at the outer cheeks only for the smiling expression.
-    if (emotion_ == Emotion::Happy && !sleeping_ && openness > 0.35f) {
-        canvas_.fillCircle(leftEyeX - 47, eyeY + 13, 3, kAccent);
-        canvas_.fillCircle(rightEyeX + 47, eyeY + 13, 3, kAccent);
+    // A few inexpensive visual accents keep expressive moods distinct.
+    if (!sleeping_ && openness > 0.35f) {
+        if (emotion_ == Emotion::Happy || emotion_ == Emotion::Love) {
+            canvas_.fillCircle(leftEyeX - 47, eyeY + 13, 3, kAccent);
+            canvas_.fillCircle(rightEyeX + 47, eyeY + 13, 3, kAccent);
+        } else if (emotion_ == Emotion::Sad) {
+            // A single falling tear; position is always above the HUD.
+            const int drop = static_cast<int>(
+                ((animationNowMs_ - emotionStartedMs_) / 45u) % 12u);
+            canvas_.fillCircle(rightEyeX + 29, eyeY + 25 + drop, 3, kAccent);
+            canvas_.fillTriangle(rightEyeX + 26, eyeY + 24 + drop,
+                                 rightEyeX + 32, eyeY + 24 + drop,
+                                 rightEyeX + 29, eyeY + 17 + drop, kAccent);
+        } else if (emotion_ == Emotion::Excited) {
+            // Twin sparkles at the outer edges, blinking independently.
+            const int spark = (animationNowMs_ / 180u) % 2u == 0u ? 6 : 3;
+            for (int side = -1; side <= 1; side += 2) {
+                const int sx = width_ / 2 + side * 113;
+                const int sy = eyeY - 18;
+                canvas_.fillRect(sx - 1, sy - spark, 3, 2 * spark + 1, kAccent);
+                canvas_.fillRect(sx - spark, sy - 1, 2 * spark + 1, 3, kAccent);
+            }
+        } else if (emotion_ == Emotion::Playful) {
+            canvas_.fillCircle(leftEyeX - 44, eyeY + 9, 3, kAccent);
+        }
     }
 
-    // Keep the original HUD legible and clear of the face geometry.
     canvas_.fillCircle(15, 13, 4, sleeping_ ? kMuted : kAccent);
     canvas_.setTextColor(kMuted, kBackground);
     canvas_.setTextSize(1);
