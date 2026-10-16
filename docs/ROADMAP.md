@@ -1,3 +1,14 @@
+## Comic micro-stories — added to PR #2 (16 October 2026)
+
+- [x] Three fixed scripts: Suspicious, Bedhead, Meltdown, using 3–4 emotions each
+- [x] Pure C++11 `ComicStories.h`: one stage per tick, rollover-safe and cancellation-safe
+- [x] Integration with `ReactionController` as sole owner of temporary emotions; no extra sprite or memory allocation
+- [x] Automatic every third idle comedy cameo, with RAM-only opt-out
+- [x] Serial `story status/next/stop/auto on/auto off`; strict Neutral/sleep/host/build priority
+- [x] Host tests for durations, ordering, interrupt behavior, millis rollover and reaction priority
+- [ ] Confirm story timing, frame transitions and FPS on real LILYGO T-Display-S3
+- [ ] Consider user-editable scripts as a future independent feature
+
 ## Autonomous comic micro-skits (added to PR #2, 16 October 2026)
 
 - [x] Independent C++11 comedy director, separate RNG and interrupt-safe transient scheduling
