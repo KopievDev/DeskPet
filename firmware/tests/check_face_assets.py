@@ -396,7 +396,8 @@ assert "void equip(Item item)" in wardrobe
 assert '#include "AccessoryWardrobe.h"' in serial
 assert "deskpet_accessories::Wardrobe wardrobe;" in serial
 assert "wardrobe.tick(reactions.desiredEmotion(), ambient.personality()," in serial
-assert "face.setAccessories(wardrobe.outfit());" in serial
+assert "deskpet_accessories::Outfit currentOutfit = wardrobe.outfit();" in serial
+assert "face.setAccessories(currentOutfit);" in serial
 assert "void FaceAnimator::drawAccessories(int eyeY, float openness)" in source
 assert "drawAccessories(eyeY, openness);" in source
 assert "deskpet_accessories::Outfit accessories_" in face_header
