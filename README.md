@@ -1,3 +1,19 @@
+## Autonomous Comic Director — idle micro-skits (16 October 2026)
+
+Alongside the 26 manual expressions, DeskPet can now initiate **short cartoon reactions on its own** while visibly idle in Neutral. The independent C++11 `ComedyDirector.h` picks among Unibrow, Scruffy, SideEye, Puffed and Goofy, avoids playing the same expression twice consecutively, and varies the selection by personality, energy, mood, attention and affection.
+
+The director counts only **eligible awake/Neutral time**. Calm takes roughly **70–95 seconds**, Playful **42–68 seconds**, and Cheeky **50–80 seconds** (excluding higher-priority activity). Short needs/bond/computer/idle-gesture interruptions *pause* the countdown instead of losing all progress. It never interrupts explicit USER/BOOT input, an active build result, manual emotion, sleep, demo, a Mac-away scene or other temporary animation. A cameo uses `ReactionController::showTemporary(..., 4800)` and automatically returns to Neutral. A new user action cancels it immediately.
+
+```text
+neutral          # choose the idle baseline first
+comedy status    # current on/off, cameo count, previous act, quiet-time remaining
+comedy now       # explicit preview; still respects priority and refuses while busy
+comedy off       # disable automatic comedy; manual emotion commands still work
+comedy on        # enable automatic comedy
+```
+
+The scheduling state and on/off toggle are **RAM-only**, not part of NVS progress; default on after reboot. The five facial geometries are rendered by existing RGB565 canvas primitives with no additional sprites, allocations, timers or network connections. Tests: `firmware/tests/comedy_director_test.cpp` (determinism, weighted selection, non-repeating faces, suspended time, manual preview, rollover) and updated source-level regression.
+
 ## Comic Expressions Pack — 26 faces (16 October 2026)
 
 Five new playful cartoon faces have been added to the existing 21 expressions. They are deliberately exaggerated *fictional* characters, not depictions of an ethnicity.
