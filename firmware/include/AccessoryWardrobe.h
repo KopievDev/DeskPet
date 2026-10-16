@@ -108,6 +108,12 @@ public:
         visible_ = emptyOutfit();
     }
 
+    // The stored outfit has already passed PetProgress::valid().
+    void restore(Mode mode, Outfit manual) {
+        manual_ = manual;
+        setMode(mode);
+    }
+
     Mode mode() const { return mode_; }
     Outfit outfit() const { return visible_; }
     Outfit manualOutfit() const { return manual_; }

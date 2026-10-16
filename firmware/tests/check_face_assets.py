@@ -442,5 +442,28 @@ for item in ("Crown", "Shades", "StarPin"):
     assert f"Item::{item}" in source
 assert (ROOT / "tests/pet_finds_test.cpp").is_file()
 
+progress = (ROOT / "include/PetProgress.h").read_text(encoding="utf-8")
+storage = (ROOT / "include/PetProgressStorage.h").read_text(encoding="utf-8")
+assert "struct Snapshot" in progress
+assert "kVersion = 1u" in progress
+assert "kWireSize = 28u" in progress
+assert "uint32_t checksum(" in progress
+assert "inline bool decode(" in progress
+assert "class Journal" in progress
+assert "kMinWriteIntervalMs = 60000u" in progress
+assert "class Storage" in storage
+assert "prefs_.putBytes(" in storage
+assert '"saveA"' in storage and '"saveB"' in storage
+assert "bool clear()" in storage
+assert "deskpet_progress::Storage saveStorage;" in serial
+assert "deskpet_progress::Journal saveJournal;" in serial
+assert "restoreProgress(restored, startedAt)" in serial
+assert "saveJournal.begin(captureProgress(), startedAt, loaded)" in serial
+assert "autoSaveProgress(now);" in serial
+assert 'strcmp(command, "save status")' in serial
+assert 'strcmp(command, "save now")' in serial
+assert 'strcmp(command, "save reset confirm")' in serial
+assert (ROOT / "tests/pet_progress_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")

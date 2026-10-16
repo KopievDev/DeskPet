@@ -40,6 +40,13 @@ public:
         lastSleeping_ = false;
     }
 
+    // Restore values without crediting elapsed time while powered off.
+    void restore(uint8_t energy, uint8_t mood, uint8_t attention,
+                 bool enabled, uint32_t nowMs) {
+        setEnabled(enabled, nowMs);
+        set(energy, mood, attention, nowMs);
+    }
+
     uint8_t energy() const { return energy_; }
     uint8_t mood() const { return mood_; }
     uint8_t attention() const { return attention_; }

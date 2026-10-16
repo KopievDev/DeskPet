@@ -14,6 +14,8 @@
 #include "PetNeeds.h"
 #include "AccessoryWardrobe.h"
 #include "PetFinds.h"
+#include "PetProgress.h"
+#include "PetProgressStorage.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -49,6 +51,61 @@ void announceFind(deskpet_finds::Prize prize, uint32_t nowMs) {
     face.setFindNotice(accessoryFor(prize), nowMs);
 }
 IdleBehavior ambient;
+deskpet_progress::Storage saveStorage;
+deskpet_progress::Journal saveJournal;
+bool autoSaveEnabled = true;
+
+deskpet_progress::Snapshot captureProgress() {
+    deskpet_progress::Snapshot state;
+    state.bond = bond.score();
+    state.energy = needs.energy();
+    state.mood = needs.mood();
+    state.attention = needs.attention();
+    const deskpet_finds::Collection::State rare = finds.state();
+    state.owned = rare.owned;
+    state.play = rare.play;
+    state.pet = rare.pet;
+    state.builds = rare.builds;
+    state.wardrobeMode = wardrobe.mode();
+    state.outfit = wardrobe.manualOutfit();
+    state.personality = ambient.personality();
+    state.needsEnabled = needs.enabled();
+    state.bondEnabled = bond.enabled();
+    return state;
+}
+
+void restoreProgress(const deskpet_progress::Snapshot& state,
+                     uint32_t nowMs) {
+    bond.restore(state.bond, nowMs);
+    bond.setEnabled(state.bondEnabled, nowMs);
+    needs.restore(state.energy, state.mood, state.attention,
+                  state.needsEnabled, nowMs);
+    finds.restore({state.owned, state.play, state.pet, state.builds}, nowMs);
+    wardrobe.restore(state.wardrobeMode, state.outfit);
+    ambient.setPersonality(state.personality, nowMs);
+    face.setPersonality(state.personality, nowMs);
+    face.setAffection(bond.score());
+    face.setNeeds(needs.energy(), needs.mood(), needs.attention());
+}
+
+bool saveProgressNow(uint32_t nowMs) {
+    const deskpet_progress::Snapshot snapshot = captureProgress();
+    if (!saveStorage.ready() || !saveStorage.write(snapshot)) {
+        saveJournal.failed(nowMs);
+        return false;
+    }
+    saveJournal.wrote(snapshot, nowMs);
+    return true;
+}
+
+void autoSaveProgress(uint32_t nowMs) {
+    saveJournal.observe(captureProgress(), nowMs);
+    if (autoSaveEnabled && saveJournal.shouldWrite(nowMs)) {
+        if (!saveProgressNow(nowMs))
+            Serial.println("NVS save failed; will retry");
+    }
+}
+
 
 struct NamedEmotion {
     const char* command;
@@ -202,6 +259,10 @@ void showStatus() {
     Serial.print(" T");
     Serial.print(needs.attention());
     Serial.print(needs.enabled() ? "" : " (off)");
+    Serial.print(" | save: ");
+    Serial.print(saveStorage.ready() ? "ready" : "unavailable");
+    Serial.print(autoSaveEnabled ? "/auto" : "/manual");
+    Serial.print(saveJournal.dirty() ? "/dirty" : "");
     Serial.print(" | wardrobe: ");
     Serial.print(deskpet_accessories::modeName(wardrobe.mode()));
     Serial.print(" | build failures: ");
@@ -237,6 +298,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Inventory: inventory | wear status | wear auto/on/off/clear/random");
         Serial.println("Wear: wear beanie/partyhat/glasses/mustache/bowtie/crown/shades/starpin");
         Serial.println("Finds: find status | find reset | find grant crown/shades/starpin");
+        Serial.println("Save: save status | save on/off | save now | save reset confirm");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -245,6 +307,53 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "status") == 0) {
         showStatus();
+        return;
+    }
+    if (strcmp(command, "save status") == 0) {
+        saveJournal.observe(captureProgress(), nowMs);
+        Serial.print("NVS: ");
+        Serial.print(saveStorage.ready() ? "READY" : "UNAVAILABLE");
+        Serial.print(" | autosave: ");
+        Serial.print(autoSaveEnabled ? "ON" : "OFF");
+        Serial.print(" | stored: ");
+        Serial.print(saveJournal.loaded() ? "YES" : "NO");
+        Serial.print(" | pending: ");
+        Serial.print(saveJournal.dirty() ? "YES" : "NO");
+        Serial.print(" | format: v");
+        Serial.println(deskpet_progress::kVersion);
+        return;
+    }
+    if (strcmp(command, "save on") == 0 ||
+        strcmp(command, "save off") == 0) {
+        autoSaveEnabled = strcmp(command, "save on") == 0;
+        Serial.println(autoSaveEnabled ? "Autosave ON" : "Autosave OFF");
+        return;
+    }
+    if (strcmp(command, "save now") == 0) {
+        saveJournal.observe(captureProgress(), nowMs);
+        if (!saveJournal.dirty() && saveJournal.loaded()) {
+            Serial.println("Progress already saved");
+            return;
+        }
+        Serial.println(saveProgressNow(nowMs) ?
+                       "Progress saved to NVS" : "NVS save failed");
+        return;
+    }
+    if (strcmp(command, "save reset confirm") == 0) {
+        if (!saveStorage.clear()) {
+            Serial.println("NVS erase FAILED: progress not reset");
+            return;
+        }
+        // Erase both checkpoints AND reset the in-memory game state,
+        // otherwise the next autosave would recreate the old progress.
+        restoreProgress(deskpet_progress::Snapshot(), nowMs);
+        face.setFindNotice(deskpet_accessories::Item::None, nowMs);
+        saveJournal.begin(captureProgress(), nowMs, false);
+        Serial.println("NVS and pet progress reset to defaults");
+        return;
+    }
+    if (strcmp(command, "save reset") == 0) {
+        Serial.println("To erase progress, type: save reset confirm");
         return;
     }
     if (strcmp(command, "comic next") == 0) {
@@ -739,6 +848,15 @@ void setup() {
     face.setAffection(bond.score());
     face.setNeeds(needs.energy(), needs.mood(), needs.attention());
     ambient.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0xB16B00B5u);
+    const bool nvsReady = saveStorage.begin();
+    deskpet_progress::Snapshot restored;
+    const bool loaded = nvsReady && saveStorage.load(restored);
+    if (loaded) restoreProgress(restored, startedAt);
+    saveJournal.begin(captureProgress(), startedAt, loaded);
+    Serial.println(nvsReady
+        ? (loaded ? "Pet progress restored from NVS" :
+                    "No valid NVS save; using defaults")
+        : "NVS unavailable; pet progress remains in RAM");
     Serial.println("DeskPet 0.1 ready. Type help.");
 }
 
@@ -832,6 +950,7 @@ void loop() {
         face.setIdleGesture(ambient.gesture(), ambient.startedMs());
     }
 
+    autoSaveProgress(now);
     face.update(now);
     delay(1);
 }
