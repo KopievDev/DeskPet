@@ -413,7 +413,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "comic next") == 0) {
-        // Rapid preview of the four acting scenes without running
+        // Rapid preview of the nine acting scenes without running
         // through all 26 moods in USER/demo order.
         comedy.activity(nowMs);
         constexpr Emotion comicMoods[] = {
@@ -744,6 +744,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "demo on") == 0) {
+        comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = true;
         reactions.chooseEmotion(Emotion::Neutral, nowMs);
@@ -754,6 +755,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "demo off") == 0) {
+        comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.activity(nowMs);
@@ -788,6 +790,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "sleep") == 0 || strcmp(command, "wake") == 0) {
+        comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.activity(nowMs);
@@ -835,6 +838,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "next") == 0) {
+        comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.nextEmotion(nowMs);
@@ -847,6 +851,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     for (const auto& item : kEmotionCommands) {
         if (strcmp(command, item.command) == 0) {
+            comedy.activity(nowMs);
             cancelAmbient(nowMs);
             demoEnabled = false;
             reactions.chooseEmotion(item.emotion, nowMs);
