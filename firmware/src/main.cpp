@@ -200,6 +200,7 @@ void advanceComicStory(uint32_t nowMs) {
 
 void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
+    stories.cancel();
     comedy.activity(nowMs);
     cancelAmbient(nowMs);
     demoEnabled = false;
@@ -236,6 +237,7 @@ void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
 
 void handleBootGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
+    stories.cancel();
     comedy.activity(nowMs);
     cancelAmbient(nowMs);
     demoEnabled = false;
@@ -498,6 +500,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "comic next") == 0) {
+        stories.cancel();
         // Rapid preview of the nine acting scenes without running
         // through all 26 moods in USER/demo order.
         comedy.activity(nowMs);
@@ -561,6 +564,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "event user-idle") == 0 ||
         strcmp(command, "event user-active") == 0) {
+        stories.cancel();
         const deskpet_activity::Presence previous = userActivity.presence();
         if (strcmp(command, "event user-idle") == 0) {
             userActivity.idle(nowMs);
@@ -766,6 +770,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
             announceFind(finds.reward(deskpet_finds::Action::Play, nowMs), nowMs);
         }
         if (face.isSleeping()) face.setSleeping(false, nowMs);
+        stories.cancel();
         comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
@@ -832,6 +837,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "demo on") == 0) {
+        stories.cancel();
         comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = true;
@@ -843,6 +849,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "demo off") == 0) {
+        stories.cancel();
         comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
@@ -878,6 +885,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "sleep") == 0 || strcmp(command, "wake") == 0) {
+        stories.cancel();
         comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
@@ -895,6 +903,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
 
     if (strcmp(command, "event build-success") == 0 ||
         strcmp(command, "event build-failure") == 0) {
+        stories.cancel();
         if (face.isSleeping()) {
             Serial.println("Event ignored while DeskPet is sleeping");
             return;
@@ -927,6 +936,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
 
     if (strcmp(command, "next") == 0) {
+        stories.cancel();
         comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
@@ -940,6 +950,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     for (const auto& item : kEmotionCommands) {
         if (strcmp(command, item.command) == 0) {
+            stories.cancel();
             comedy.activity(nowMs);
             cancelAmbient(nowMs);
             demoEnabled = false;
@@ -1009,6 +1020,7 @@ void setup() {
     comedy.begin(startedAt,
                  static_cast<uint32_t>(micros()) ^ 0xC09ED1A1u,
                  ambient.personality());
+    stories.begin();
     saveJournal.begin(captureProgress(), startedAt, loaded);
     Serial.println(nvsReady
         ? (loaded ? "Pet progress restored from NVS" :
@@ -1025,6 +1037,7 @@ void loop() {
         bootButton.poll(digitalRead(kBootButtonPin) == LOW, now), now);
 
     readSerial(now);
+    advanceComicStory(now);
     needs.advance(now, face.isSleeping());
     if (demoEnabled && static_cast<int32_t>(now - nextDemoMs) >= 0) {
         reactions.nextEmotion(now);
@@ -1087,8 +1100,15 @@ void loop() {
                     needs.energy(), needs.mood(), needs.attention(),
                     bond.score(), idleComedy)) {
         cancelAmbient(now);
-        reactions.showTemporary(idleComedy.emotion, now,
-                                idleComedy.durationMs);
+        // Every third idle cameo becomes a three/four-beat micro-story.
+        deskpet_stories::Beat first = {Emotion::Neutral, 0u};
+        if (stories.autoEnabled() && comedy.count() % 3u == 0u &&
+            stories.startNext(now, first)) {
+            reactions.showTemporary(first.emotion, now, first.durationMs);
+        } else {
+            reactions.showTemporary(idleComedy.emotion, now,
+                                    idleComedy.durationMs);
+        }
         syncReaction(now);
     }
     face.setAffection(bond.score());
