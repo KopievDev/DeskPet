@@ -1,3 +1,41 @@
+## NVS persistence (ESP32-S3 · 16 October 2026)
+
+DeskPet now remembers its **game progress** when power is unplugged. Persisted data: affection (bond), energy/mood/attention and their enabled switches, rare accessory unlocks and partial play/pet/build reward counters, wardrobe mode and manual outfit, and personality (Calm/Playful/Cheeky).
+
+The format is **v1**, 28 bytes, with a `DPET` magic header, length, monotonically increasing generation, CRC32 and validation. Two alternating `Preferences` keys in NVS (`saveA`/`saveB` in namespace `deskpet`) preserve an older valid snapshot in case of interrupted/corrupt writes. Unsupported versions or invalid entries revert to defaults rather than injecting malformed game state.
+
+**Write policy:** the firmware observes changed gameplay fields in `loop()`, waits at least 15 seconds after the first change, and writes no more than once per 60 seconds during normal autosave. Failed writes retry after at least five seconds without shortening the rate limit. Abrupt power loss can lose the latest *unsaved* progress. No timers are replayed for time spent disconnected.
+
+Deliberately not saved: the current animation, sleep state, manually selected emotion, temporary skits, Mac activity, `sass` (always off after reboot), and RNG seeds.
+
+```text
+save status            # NVS available? auto on/off? saved copy? pending changes?
+save on                # enable automatic writes
+save off               # suspend automatic writes
+save now               # force a checkpoint for current gameplay state
+save reset             # show confirmation help
+save reset confirm     # erase both saved copies and reset gameplay in RAM
+```
+
+Local checks:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+for test in firmware/tests/*_test.cpp; do
+  name=$(basename "$test" .cpp)
+  c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include "$test" -o "/tmp/$name" || exit 1
+  "/tmp/$name" || exit 1
+done
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+pio device monitor -d firmware -b 115200
+# Serial: needs set 11 22 33 / wear beanie / save now
+# Disconnect and reconnect power, then: status / save status
+```
+
+Historical descriptions below that say "RAM only" describe pre-persistence development stages. They no longer apply to the saved game fields described above.
+
 ## Collectible rare accessories — 16 October 2026
 
 DeskPet keeps **five starting items** (beanie, party hat, glasses, mustache and bow tie) and now has **three unlockable rares**: a golden crown, dark shades and a golden star pin. All progress lives in RAM and resets on restart; no NVS, account, or network access.
