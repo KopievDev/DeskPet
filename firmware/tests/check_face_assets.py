@@ -255,7 +255,10 @@ assert "PetBond bond;" in serial
 assert "bond.pet(nowMs);" in serial
 assert "bond.surprise(nowMs);" in serial
 assert "bond.build(success, nowMs);" in serial
-assert "const bool allowBond = allowAmbient &&" in serial
+# Bond must inherit the stronger Needs eligibility gate, which itself
+# includes Ambient's sleep/demo/manual-emotion exclusions.
+assert re.search(r"const bool allowNeeds\s*=\s*allowAmbient\s*&&", serial)
+assert re.search(r"const bool allowBond\s*=\s*allowNeeds\s*&&", serial)
 assert "!reactions.reactionActive() &&" in serial
 assert "userActivity.presence() != deskpet_activity::Presence::Away" in serial
 assert "bond.tick(now, !face.isSleeping(), allowBond" in serial
