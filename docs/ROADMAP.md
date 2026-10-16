@@ -1,3 +1,17 @@
+## Collectible rare items — PR #1 (16 October 2026)
+
+- [x] Keep five starter wardrobe items freely usable.
+- [x] Add crown, shades, star pin graphics and three rare inventory flags.
+- [x] Rewards for successful builds / needs play / USER hold, one per 60 seconds.
+- [x] No unlock for passive inactivity or failed builds.
+- [x] Manual wear rejects locked rare items; random outfits only draw from owned props.
+- [x] Auto outfits integrate rare items, with sleep hiding and wake restoring props.
+- [x] Serial `inventory`, `find status/reset/grant`; NEW! temporary LCD announcement.
+- [x] Independent C++11 host checks for reward milestones, cooldown, deterministic PRNG and rollover.
+- [x] Fix source-only regression for Bond eligibility inherited from Needs.
+- [ ] Verify Python/C++ host tests, PlatformIO build and visual positioning on real IPS.
+- [ ] Future: optional opt-in NVS persistence and additional collectible item sets.
+
 ## Wardrobe and comic accessories — implemented in PR #1 (16 October 2026)
 
 - [x] Three independent accessory slots: head / eyes / face
