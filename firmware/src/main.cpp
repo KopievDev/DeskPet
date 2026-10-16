@@ -100,7 +100,8 @@ bool saveProgressNow(uint32_t nowMs) {
 
 void autoSaveProgress(uint32_t nowMs) {
     saveJournal.observe(captureProgress(), nowMs);
-    if (autoSaveEnabled && saveJournal.shouldWrite(nowMs)) {
+    if (autoSaveEnabled && saveStorage.ready() &&
+        saveJournal.shouldWrite(nowMs)) {
         if (!saveProgressNow(nowMs))
             Serial.println("NVS save failed; will retry");
     }
