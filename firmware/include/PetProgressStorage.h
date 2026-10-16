@@ -30,7 +30,7 @@ public:
             nextA_ = true;
             return false;
         }
-        const bool chooseA = validA && (!validB || newer(seqA, seqB));
+        const bool chooseA = preferA(validA, seqA, validB, seqB);
         value = chooseA ? a : b;
         nextSequence_ = (chooseA ? seqA : seqB) + 1u;
         nextA_ = !chooseA;
