@@ -13,6 +13,7 @@
 #include "UserActivity.h"
 #include "PetNeeds.h"
 #include "AccessoryWardrobe.h"
+#include "PetFinds.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -29,6 +30,24 @@ deskpet_build_comedy::Story buildStory;
 deskpet_activity::Controller userActivity;
 deskpet_needs::Controller needs;
 deskpet_accessories::Wardrobe wardrobe;
+deskpet_finds::Collection finds;
+
+deskpet_accessories::Item accessoryFor(deskpet_finds::Prize prize) {
+    switch (prize) {
+        case deskpet_finds::Prize::Crown: return deskpet_accessories::Item::Crown;
+        case deskpet_finds::Prize::Shades: return deskpet_accessories::Item::Shades;
+        case deskpet_finds::Prize::StarPin: return deskpet_accessories::Item::StarPin;
+        case deskpet_finds::Prize::None: return deskpet_accessories::Item::None;
+    }
+    return deskpet_accessories::Item::None;
+}
+
+void announceFind(deskpet_finds::Prize prize, uint32_t nowMs) {
+    if (prize == deskpet_finds::Prize::None) return;
+    Serial.print("FOUND rare accessory: ");
+    Serial.println(deskpet_finds::prizeName(prize));
+    face.setFindNotice(accessoryFor(prize), nowMs);
+}
 IdleBehavior ambient;
 
 struct NamedEmotion {
@@ -95,6 +114,7 @@ void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::Hold) {
         bond.pet(nowMs);
         needs.pet();
+        announceFind(finds.reward(deskpet_finds::Action::Pet, nowMs), nowMs);
     } else if (action == deskpet_button::Action::DoubleTap) {
         bond.surprise(nowMs);
         needs.surprise();
@@ -215,7 +235,8 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Needs: needs status/reset/on/off | needs coffee/play | needs set E M T");
         Serial.println("Needs debug: needs show coffee/attention/cheer");
         Serial.println("Inventory: inventory | wear status | wear auto/on/off/clear/random");
-        Serial.println("Wear: wear beanie/partyhat/glasses/mustache/bowtie");
+        Serial.println("Wear: wear beanie/partyhat/glasses/mustache/bowtie/crown/shades/starpin");
+        Serial.println("Finds: find status | find reset | find grant crown/shades/starpin");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -303,8 +324,51 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "inventory") == 0) {
-        Serial.println("Owned: beanie partyhat glasses mustache bowtie (RAM only)");
-        Serial.println("Slots: head | eyes | face. Wear one item per slot.");
+        Serial.println("Starter: beanie partyhat glasses mustache bowtie");
+        Serial.print("crown: ");
+        Serial.println(finds.owns(deskpet_finds::Prize::Crown) ? "OWNED" : "LOCKED");
+        Serial.print("shades: ");
+        Serial.println(finds.owns(deskpet_finds::Prize::Shades) ? "OWNED" : "LOCKED");
+        Serial.print("starpin: ");
+        Serial.println(finds.owns(deskpet_finds::Prize::StarPin) ? "OWNED" : "LOCKED");
+        Serial.println("Slots: head | eyes | face. All items RAM only.");
+        return;
+    }
+    if (strcmp(command, "find status") == 0) {
+        Serial.print("Inventory: ");
+        Serial.print(5u + finds.rareCount());
+        Serial.print("/8 | build: ");
+        Serial.print(finds.buildProgress());
+        Serial.print("/3 | play: ");
+        Serial.print(finds.playProgress());
+        Serial.print("/4 | pet: ");
+        Serial.print(finds.petProgress());
+        Serial.println("/5 | rare drop cooldown 60s");
+        return;
+    }
+    if (strcmp(command, "find reset") == 0) {
+        finds.reset();
+        // Rare clothes from the previous game cannot stay equipped.
+        wardrobe.clear();
+        face.setFindNotice(deskpet_accessories::Item::None, nowMs);
+        Serial.println("Finds reset; 5 common items still owned");
+        return;
+    }
+    if (strncmp(command, "find grant ", 11) == 0) {
+        const char* name = command + 11;
+        deskpet_finds::Prize prize = deskpet_finds::Prize::None;
+        if (strcmp(name, "crown") == 0)
+            prize = deskpet_finds::Prize::Crown;
+        else if (strcmp(name, "shades") == 0)
+            prize = deskpet_finds::Prize::Shades;
+        else if (strcmp(name, "starpin") == 0)
+            prize = deskpet_finds::Prize::StarPin;
+        if (prize == deskpet_finds::Prize::None) {
+            Serial.println("Use: find grant crown | shades | starpin");
+            return;
+        }
+        if (finds.grant(prize)) announceFind(prize, nowMs);
+        else Serial.println("Already owned");
         return;
     }
     if (strcmp(command, "wear status") == 0) {
@@ -356,8 +420,23 @@ void handleCommand(const char* command, uint32_t nowMs) {
             item = deskpet_accessories::Item::Mustache;
         else if (strcmp(name, "bowtie") == 0)
             item = deskpet_accessories::Item::BowTie;
+        else if (strcmp(name, "crown") == 0)
+            item = deskpet_accessories::Item::Crown;
+        else if (strcmp(name, "shades") == 0)
+            item = deskpet_accessories::Item::Shades;
+        else if (strcmp(name, "starpin") == 0)
+            item = deskpet_accessories::Item::StarPin;
         else {
-            Serial.println("Use: wear beanie | partyhat | glasses | mustache | bowtie");
+            Serial.println("Use: wear beanie | partyhat | glasses | mustache | bowtie | crown | shades | starpin");
+            return;
+        }
+        if ((item == deskpet_accessories::Item::Crown &&
+             !finds.owns(deskpet_finds::Prize::Crown)) ||
+            (item == deskpet_accessories::Item::Shades &&
+             !finds.owns(deskpet_finds::Prize::Shades)) ||
+            (item == deskpet_accessories::Item::StarPin &&
+             !finds.owns(deskpet_finds::Prize::StarPin))) {
+            Serial.println("LOCKED: earn rare gear by builds, play or USER holds");
             return;
         }
         wardrobe.equip(item);
@@ -424,7 +503,10 @@ void handleCommand(const char* command, uint32_t nowMs) {
             return;
         }
         if (coffee) needs.coffee();
-        else if (play) needs.play();
+        else if (play) {
+            needs.play();
+            announceFind(finds.reward(deskpet_finds::Action::Play, nowMs), nowMs);
+        }
         if (face.isSleeping()) face.setSleeping(false, nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
@@ -559,6 +641,9 @@ void handleCommand(const char* command, uint32_t nowMs) {
         const bool success = strcmp(command, "event build-success") == 0;
         bond.build(success, nowMs);
         needs.build(success);
+        if (success)
+            announceFind(finds.reward(deskpet_finds::Action::BuildSuccess,
+                                      nowMs), nowMs);
         const deskpet_build_comedy::Cue cue =
             buildStory.record(success, nowMs);
         // Keep the manually chosen baseline. A button press or a direct
@@ -646,6 +731,7 @@ void setup() {
     userActivity.begin(startedAt);
     needs.begin(startedAt);
     wardrobe.begin(static_cast<uint32_t>(micros()) ^ 0x5C8330A1u);
+    finds.begin(static_cast<uint32_t>(micros()) ^ 0xD35CA77u);
     bond.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0x682C95B3u);
     face.setAffection(bond.score());
     face.setNeeds(needs.energy(), needs.mood(), needs.attention());
@@ -718,7 +804,22 @@ void loop() {
     wardrobe.tick(reactions.desiredEmotion(), ambient.personality(),
                  needs.energy(), needs.mood(), needs.attention(),
                  face.isSleeping());
-    face.setAccessories(wardrobe.outfit());
+    deskpet_accessories::Outfit currentOutfit = wardrobe.outfit();
+    // Unlocked rares are used by Auto; manual mode never gets overridden.
+    if (wardrobe.mode() == deskpet_accessories::Mode::Auto &&
+        !face.isSleeping()) {
+        const Emotion mood = reactions.desiredEmotion();
+        if (finds.owns(deskpet_finds::Prize::Crown) &&
+            needs.mood() >= 90u && mood != Emotion::Sleepy)
+            currentOutfit.head = deskpet_accessories::Item::Crown;
+        if (finds.owns(deskpet_finds::Prize::Shades) &&
+            mood == Emotion::Smug)
+            currentOutfit.eyes = deskpet_accessories::Item::Shades;
+        if (finds.owns(deskpet_finds::Prize::StarPin) &&
+            mood == Emotion::Excited)
+            currentOutfit.face = deskpet_accessories::Item::StarPin;
+    }
+    face.setAccessories(currentOutfit);
     if (!reactions.reactionActive()) {
         face.setNeedPrompt(deskpet_needs::Kind::None);
     }
