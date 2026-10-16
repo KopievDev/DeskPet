@@ -16,6 +16,7 @@
 #include "PetFinds.h"
 #include "PetProgress.h"
 #include "PetProgressStorage.h"
+#include "ComedyDirector.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -53,6 +54,7 @@ void announceFind(deskpet_finds::Prize prize, uint32_t nowMs) {
 IdleBehavior ambient;
 deskpet_progress::Storage saveStorage;
 deskpet_progress::Journal saveJournal;
+deskpet_comedy::Director comedy;
 bool autoSaveEnabled = true;
 
 deskpet_progress::Snapshot captureProgress() {
@@ -171,6 +173,7 @@ void syncReaction(uint32_t nowMs) {
 
 void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
+    comedy.activity(nowMs);
     cancelAmbient(nowMs);
     demoEnabled = false;
     face.setNeedPrompt(deskpet_needs::Kind::None);
@@ -206,6 +209,7 @@ void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
 
 void handleBootGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
+    comedy.activity(nowMs);
     cancelAmbient(nowMs);
     demoEnabled = false;
     face.setNeedPrompt(deskpet_needs::Kind::None);
@@ -235,6 +239,7 @@ void handleBootGesture(deskpet_button::Action action, uint32_t nowMs) {
         syncReaction(nowMs);
         ambient.setPersonality(next, nowMs);
         face.setPersonality(next, nowMs);
+        comedy.setPersonality(next, nowMs);
         Serial.print("BOOT hold -> personality ");
         Serial.println(personalityName(next));
     }
@@ -269,6 +274,9 @@ void showStatus() {
     Serial.print(saveStorage.ready() ? "ready" : "unavailable");
     Serial.print(autoSaveEnabled ? "/auto" : "/manual");
     Serial.print(saveJournal.dirty() ? "/dirty" : "");
+    Serial.print(" | comedy: ");
+    Serial.print(comedy.enabled() ? "on/" : "off/");
+    Serial.print(comedy.count());
     Serial.print(" | wardrobe: ");
     Serial.print(deskpet_accessories::modeName(wardrobe.mode()));
     Serial.print(" | build failures: ");
@@ -291,6 +299,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic unibrow scruffy sideeye puffed goofy");
         Serial.println("Comic preview: comic next (Nerd, Derp, Gremlin, Panic, Unibrow, Scruffy, SideEye, Puffed, Goofy)");
+        Serial.println("Idle comedy: comedy status | comedy on/off | comedy now");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
         Serial.println("Buttons: USER tap next; double-tap surprise; hold pet LOVE");
         Serial.println("Buttons: BOOT tap sleep/wake; hold cycle calm/playful/cheeky");
@@ -362,9 +371,51 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("To erase progress, type: save reset confirm");
         return;
     }
+    if (strcmp(command, "comedy status") == 0) {
+        Serial.print("Idle comedy: ");
+        Serial.print(comedy.enabled() ? "ON" : "OFF");
+        Serial.print(" | cameos: ");
+        Serial.print(comedy.count());
+        Serial.print(" | last: ");
+        Serial.print(comedy.lastEmotion() == Emotion::Count
+            ? "none" : emotionName(comedy.lastEmotion()));
+        Serial.print(" | eligible quiet seconds remaining: ");
+        Serial.println(comedy.remainingMs() / 1000u);
+        return;
+    }
+    if (strcmp(command, "comedy on") == 0 ||
+        strcmp(command, "comedy off") == 0) {
+        const bool on = strcmp(command, "comedy on") == 0;
+        comedy.setEnabled(on, nowMs);
+        Serial.println(on ? "Idle comedy ON" : "Idle comedy OFF");
+        return;
+    }
+    if (strcmp(command, "comedy now") == 0) {
+        // Even manual preview cannot displace a higher-priority reaction.
+        const bool canPreview = !face.isSleeping() && !demoEnabled &&
+            !reactions.reactionActive() && !reactions.idleActive() &&
+            reactions.manualEmotion() == Emotion::Neutral &&
+            reactions.desiredEmotion() == Emotion::Neutral &&
+            userActivity.presence() != deskpet_activity::Presence::Away;
+        if (!canPreview) {
+            Serial.println("Comedy blocked: wake up and select neutral first");
+            return;
+        }
+        deskpet_comedy::Cue cue = {Emotion::Neutral, 0u};
+        comedy.preview(nowMs, ambient.personality(),
+                       needs.energy(), needs.mood(), needs.attention(),
+                       bond.score(), cue);
+        cancelAmbient(nowMs);
+        reactions.showTemporary(cue.emotion, nowMs, cue.durationMs);
+        syncReaction(nowMs);
+        Serial.print("Comedy preview: ");
+        Serial.println(emotionName(cue.emotion));
+        return;
+    }
     if (strcmp(command, "comic next") == 0) {
         // Rapid preview of the four acting scenes without running
         // through all 26 moods in USER/demo order.
+        comedy.activity(nowMs);
         constexpr Emotion comicMoods[] = {
             Emotion::Nerd, Emotion::Derp, Emotion::Gremlin,
             Emotion::Panic, Emotion::Unibrow, Emotion::Scruffy,
@@ -671,6 +722,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         syncReaction(nowMs);
         ambient.setPersonality(next, nowMs);
         face.setPersonality(next, nowMs);
+        comedy.setPersonality(next, nowMs);
         Serial.print("Personality: ");
         Serial.println(personalityName(next));
         return;
@@ -860,6 +912,9 @@ void setup() {
     deskpet_progress::Snapshot restored;
     const bool loaded = nvsReady && saveStorage.load(restored);
     if (loaded) restoreProgress(restored, startedAt);
+    comedy.begin(startedAt,
+                 static_cast<uint32_t>(micros()) ^ 0xC09ED1A1u,
+                 ambient.personality());
     saveJournal.begin(captureProgress(), startedAt, loaded);
     Serial.println(nvsReady
         ? (loaded ? "Pet progress restored from NVS" :
@@ -926,6 +981,20 @@ void loop() {
                   ambient.personality(), comic)) {
         cancelAmbient(now);
         reactions.showTemporary(comic, now, PetBond::kComicDurationMs);
+        syncReaction(now);
+    }
+    // Below Mac presence, Needs and Bond, above cosmetic idle gestures.
+    // Accumulate eligible time; never queue events while a reaction is active.
+    deskpet_comedy::Cue idleComedy = {Emotion::Neutral, 0u};
+    const bool allowComedy = allowBond && !reactions.reactionActive() &&
+        !ambient.isActive() &&
+        userActivity.presence() != deskpet_activity::Presence::Away;
+    if (comedy.tick(now, allowComedy, ambient.personality(),
+                    needs.energy(), needs.mood(), needs.attention(),
+                    bond.score(), idleComedy)) {
+        cancelAmbient(now);
+        reactions.showTemporary(idleComedy.emotion, now,
+                                idleComedy.durationMs);
         syncReaction(now);
     }
     face.setAffection(bond.score());
