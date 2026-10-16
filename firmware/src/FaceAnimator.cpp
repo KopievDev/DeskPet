@@ -1075,6 +1075,18 @@ void FaceAnimator::drawAccessories(int eyeY, float openness) {
         canvas_.fillCircle(mid, 6, 5, 0xFE60);
     }
 
+    if (accessories_.head == deskpet_accessories::Item::Crown) {
+        constexpr uint16_t kGold = 0xFE60;
+        canvas_.fillRect(mid - 41, 29, 82, 12, kGold);
+        canvas_.fillTriangle(mid - 40, 29, mid - 36, 14,
+                             mid - 12, 29, kGold);
+        canvas_.fillTriangle(mid - 16, 29, mid, 7,
+                             mid + 16, 29, kGold);
+        canvas_.fillTriangle(mid + 12, 29, mid + 36, 14,
+                             mid + 40, 29, kGold);
+        canvas_.fillCircle(mid, 32, 4, 0xF92D);
+    }
+
     if (accessories_.eyes == deskpet_accessories::Item::Glasses) {
         constexpr uint16_t kFrame = 0xF6DE;
         // Wireframes do not mask pupils, so emotions remain readable.
@@ -1084,6 +1096,18 @@ void FaceAnimator::drawAccessories(int eyeY, float openness) {
             canvas_.drawRoundRect(lensX + 2, eyeY - 36, 74, 74, 20, kFrame);
         }
         canvas_.drawLine(mid - 23, eyeY - 19, mid + 23, eyeY - 19, kFrame);
+    }
+
+    if (accessories_.eyes == deskpet_accessories::Item::Shades) {
+        constexpr uint16_t kShades = 0x390D;
+        constexpr uint16_t kGlint = 0x9EFF;
+        for (int side = -1; side <= 1; side += 2) {
+            const int x = mid + side * 62 - 36;
+            canvas_.fillRoundRect(x, eyeY - 17, 72, 36, 9, kShades);
+            canvas_.drawRoundRect(x, eyeY - 17, 72, 36, 9, kGlint);
+            canvas_.drawLine(x + 12, eyeY - 10, x + 30, eyeY - 10, kGlint);
+        }
+        canvas_.drawLine(mid - 26, eyeY - 7, mid + 26, eyeY - 7, kGlint);
     }
 
     if (accessories_.face == deskpet_accessories::Item::Mustache) {
@@ -1103,7 +1127,29 @@ void FaceAnimator::drawAccessories(int eyeY, float openness) {
         canvas_.fillTriangle(mid, y, mid + 23, y - 10,
                              mid + 23, y + 10, kBow);
         canvas_.fillCircle(mid, y, 5, kEye);
+    } else if (accessories_.face == deskpet_accessories::Item::StarPin) {
+        constexpr uint16_t kGold = 0xFE60;
+        const int y = eyeY + 40;
+        canvas_.drawLine(mid, y - 8, mid, y + 8, kGold);
+        canvas_.drawLine(mid - 8, y, mid + 8, y, kGold);
+        canvas_.drawLine(mid - 5, y - 5, mid + 5, y + 5, kGold);
+        canvas_.drawLine(mid + 5, y - 5, mid - 5, y + 5, kGold);
+        canvas_.fillCircle(mid, y, 3, kEye);
     }
+}
+
+void FaceAnimator::drawFindNotice() {
+    if (sleeping_ || findNotice_ == deskpet_accessories::Item::None ||
+        static_cast<uint32_t>(animationNowMs_ - findNoticeStartedMs_) >=
+            3600u) return;
+    // Keep the announcement in the left gutter, clear of pupils and HUD.
+    constexpr uint16_t kGold = 0xFE60;
+    canvas_.fillRoundRect(4, 55, 48, 25, 5, kPupil);
+    canvas_.drawRoundRect(4, 55, 48, 25, 5, kGold);
+    canvas_.setTextColor(kGold, kPupil);
+    canvas_.setTextSize(1);
+    canvas_.setCursor(14, 63);
+    canvas_.print("NEW!");
 }
 
 void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
@@ -1381,6 +1427,7 @@ void FaceAnimator::render(float openness) {
     }
 
     drawAccessories(eyeY, openness);
+    drawFindNotice();
 
     canvas_.fillCircle(15, 13, 4, sleeping_ ? kMuted : kAccent);
     canvas_.setTextColor(kMuted, kBackground);
