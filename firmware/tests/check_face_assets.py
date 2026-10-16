@@ -401,10 +401,17 @@ assert "void FaceAnimator::drawAccessories(int eyeY, float openness)" in source
 assert "drawAccessories(eyeY, openness);" in source
 assert "deskpet_accessories::Outfit accessories_" in face_header
 assert "if (sleeping_ || openness <= 0.35f) return;" in source
-for command in ("inventory", "wear status", "wear auto", "wear on", "wear off",
-                "wear clear", "wear random", "wear beanie", "wear partyhat",
-                "wear glasses", "wear mustache", "wear bowtie"):
-    assert command in serial, f"Missing wardrobe command: {command}"
+for command in ("inventory", "wear status", "wear auto", "wear on",
+                "wear off", "wear clear", "wear random"):
+    assert f'strcmp(command, "{command}")' in serial, (
+        f"Missing wardrobe command: {command}"
+    )
+assert 'strncmp(command, "wear ", 5)' in serial
+for item in ("beanie", "partyhat", "glasses", "mustache", "bowtie",
+             "crown", "shades", "starpin"):
+    assert f'strcmp(name, "{item}")' in serial, (
+        f"Missing wearable item command: {item}"
+    )
 assert (ROOT / "tests/accessory_wardrobe_test.cpp").is_file()
 
 finds = (ROOT / "include/PetFinds.h").read_text(encoding="utf-8")
