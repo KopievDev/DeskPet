@@ -136,6 +136,11 @@ constexpr NamedEmotion kEmotionCommands[] = {
     {"derp", Emotion::Derp},
     {"gremlin", Emotion::Gremlin},
     {"panic", Emotion::Panic},
+    {"unibrow", Emotion::Unibrow},
+    {"scruffy", Emotion::Scruffy},
+    {"sideeye", Emotion::SideEye},
+    {"puffed", Emotion::Puffed},
+    {"goofy", Emotion::Goofy},
 };
 static_assert(sizeof(kEmotionCommands) / sizeof(kEmotionCommands[0]) ==
                   static_cast<uint8_t>(Emotion::Count),
@@ -284,8 +289,8 @@ void showStatus() {
 
 void handleCommand(const char* command, uint32_t nowMs) {
     if (strcmp(command, "help") == 0) {
-        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic");
-        Serial.println("Comic preview: comic next (Nerd -> Derp -> Gremlin -> Panic)");
+        Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic unibrow scruffy sideeye puffed goofy");
+        Serial.println("Comic preview: comic next (Nerd, Derp, Gremlin, Panic, Unibrow, Scruffy, SideEye, Puffed, Goofy)");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
         Serial.println("Buttons: USER tap next; double-tap surprise; hold pet LOVE");
         Serial.println("Buttons: BOOT tap sleep/wake; hold cycle calm/playful/cheeky");
@@ -359,14 +364,16 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "comic next") == 0) {
         // Rapid preview of the four acting scenes without running
-        // through all 21 moods in USER/demo order.
+        // through all 26 moods in USER/demo order.
         constexpr Emotion comicMoods[] = {
-            Emotion::Nerd, Emotion::Derp, Emotion::Gremlin, Emotion::Panic
+            Emotion::Nerd, Emotion::Derp, Emotion::Gremlin,
+            Emotion::Panic, Emotion::Unibrow, Emotion::Scruffy,
+            Emotion::SideEye, Emotion::Puffed, Emotion::Goofy
         };
         Emotion next = comicMoods[0];
-        for (uint8_t i = 0; i < 4u; ++i) {
+        for (uint8_t i = 0; i < sizeof(comicMoods) / sizeof(comicMoods[0]); ++i) {
             if (reactions.manualEmotion() == comicMoods[i]) {
-                next = comicMoods[(i + 1u) % 4u];
+                next = comicMoods[(i + 1u) % (sizeof(comicMoods) / sizeof(comicMoods[0]))];
                 break;
             }
         }
@@ -691,7 +698,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         if (face.isSleeping()) face.setSleeping(false, nowMs);
         syncReaction(nowMs);
         nextDemoMs = nowMs + kDemoIntervalMs;
-        Serial.println("Demo ON: cycling all 21 emotions");
+        Serial.println("Demo ON: cycling all 26 emotions");
         return;
     }
     if (strcmp(command, "demo off") == 0) {
