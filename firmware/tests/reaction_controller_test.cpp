@@ -94,7 +94,7 @@ int main() {
     reactions.nextEmotion(4400);
     checkMood(reactions, Emotion::Embarrassed);
 
-    // USER/demo must include all four comic emotions before wrapping.
+    // USER/demo must include all nine comic emotions before wrapping.
     reactions.begin(5000);
     reactions.chooseEmotion(Emotion::Bored, 5010);
     checkMood(reactions, Emotion::Bored);
@@ -109,6 +109,16 @@ int main() {
     reactions.nextEmotion(5060);
     checkMood(reactions, Emotion::Panic);
     reactions.nextEmotion(5070);
+    checkMood(reactions, Emotion::Unibrow);
+    reactions.nextEmotion(5080);
+    checkMood(reactions, Emotion::Scruffy);
+    reactions.nextEmotion(5090);
+    checkMood(reactions, Emotion::SideEye);
+    reactions.nextEmotion(5100);
+    checkMood(reactions, Emotion::Puffed);
+    reactions.nextEmotion(5110);
+    checkMood(reactions, Emotion::Goofy);
+    reactions.nextEmotion(5120);
     checkMood(reactions, Emotion::Neutral);
 
     // USER hold "pet" shows Love briefly, then restores the manual
