@@ -389,7 +389,7 @@ wardrobe = (ROOT / "include/AccessoryWardrobe.h").read_text(encoding="utf-8")
 assert "namespace deskpet_accessories" in wardrobe
 assert "class Wardrobe" in wardrobe
 assert "inline Outfit automaticOutfit(" in wardrobe
-assert "void surprise()" in wardrobe
+assert "void surprise(bool crownUnlocked = false" in wardrobe
 assert "void tick(Emotion emotion, Personality personality," in wardrobe
 assert "if (sleeping || mode_ == Mode::Off)" in wardrobe
 assert "void equip(Item item)" in wardrobe
@@ -406,6 +406,33 @@ for command in ("inventory", "wear status", "wear auto", "wear on", "wear off",
                 "wear glasses", "wear mustache", "wear bowtie"):
     assert command in serial, f"Missing wardrobe command: {command}"
 assert (ROOT / "tests/accessory_wardrobe_test.cpp").is_file()
+
+finds = (ROOT / "include/PetFinds.h").read_text(encoding="utf-8")
+assert "class Collection" in finds
+assert "kCooldownMs = 60000u" in finds
+assert "Prize reward(Action action, uint32_t nowMs)" in finds
+assert "void reset()" in finds
+assert "if (++buildProgress_ == 3u)" in finds
+assert "if (++playProgress_ == 4u)" in finds
+assert "if (++petProgress_ == 5u)" in finds
+assert "uint32_t nextRandom()" in finds
+assert '#include "PetFinds.h"' in serial
+assert "deskpet_finds::Collection finds;" in serial
+assert "finds.begin(" in serial
+assert "finds.reward(deskpet_finds::Action::BuildSuccess," in serial
+assert "finds.reward(deskpet_finds::Action::Play, nowMs)" in serial
+assert "finds.reward(deskpet_finds::Action::Pet, nowMs)" in serial
+assert "finds.owns(deskpet_finds::Prize::Crown)" in serial
+assert "face.setFindNotice(accessoryFor(prize), nowMs);" in serial
+assert 'strcmp(command, "find status")' in serial
+assert 'strcmp(command, "find reset")' in serial
+assert 'strncmp(command, "find grant ", 11)' in serial
+assert "void FaceAnimator::drawFindNotice()" in source
+assert "drawFindNotice();" in source
+for item in ("Crown", "Shades", "StarPin"):
+    assert f"Item::{item}" in wardrobe
+    assert f"Item::{item}" in source
+assert (ROOT / "tests/pet_finds_test.cpp").is_file()
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
