@@ -18,6 +18,7 @@
 #include "PetProgressStorage.h"
 #include "ComedyDirector.h"
 #include "ComicStories.h"
+#include "DeviceProtocol.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -327,7 +328,77 @@ void showStatus() {
     Serial.println(face.lifecycleName());
 }
 
+// Machine-readable USB frames for the future macOS companion.
+// One request => one DP1 response line. No heap, secrets, or Wi-Fi.
+bool handleDeviceProtocol(const char* command, uint32_t nowMs) {
+    if (strncmp(command, "dp", 2) != 0) return false;
+    deskpet_wire::Request request;
+    if (!deskpet_wire::parse(command, request)) {
+        Serial.println("DP1 ERR code=bad_request");
+        return true;
+    }
+    switch (request.action) {
+        case deskpet_wire::Action::Hello:
+            Serial.println("DP1 HELLO version=1 firmware=0.1 transport=usb capabilities=status,emotion,sleep,wake");
+            break;
+        case deskpet_wire::Action::Ping:
+            Serial.println("DP1 PONG");
+            break;
+        case deskpet_wire::Action::Status:
+            Serial.print("DP1 STATUS emotion=");
+            Serial.print(deskpet_wire::emotionToken(reactions.desiredEmotion()));
+            Serial.print(" manual=");
+            Serial.print(deskpet_wire::emotionToken(reactions.manualEmotion()));
+            Serial.print(" sleeping=");
+            Serial.print(face.isSleeping() ? "1" : "0");
+            Serial.print(" personality=");
+            Serial.print(personalityName(ambient.personality()));
+            Serial.print(" energy=");
+            Serial.print(needs.energy());
+            Serial.print(" mood=");
+            Serial.print(needs.mood());
+            Serial.print(" attention=");
+            Serial.print(needs.attention());
+            Serial.print(" bond=");
+            Serial.print(bond.score());
+            Serial.print(" demo=");
+            Serial.println(demoEnabled ? "1" : "0");
+            break;
+        case deskpet_wire::Action::Emotion:
+            stories.cancel();
+            comedy.activity(nowMs);
+            cancelAmbient(nowMs);
+            demoEnabled = false;
+            reactions.chooseEmotion(request.emotion, nowMs);
+            bond.interact(nowMs);
+            if (face.isSleeping()) face.setSleeping(false, nowMs);
+            syncReaction(nowMs);
+            Serial.print("DP1 OK emotion=");
+            Serial.println(deskpet_wire::emotionToken(request.emotion));
+            break;
+        case deskpet_wire::Action::Sleep:
+        case deskpet_wire::Action::Wake: {
+            const bool asleep = request.action == deskpet_wire::Action::Sleep;
+            stories.cancel();
+            comedy.activity(nowMs);
+            cancelAmbient(nowMs);
+            demoEnabled = false;
+            reactions.activity(nowMs);
+            if (asleep) syncReaction(nowMs);
+            face.setSleeping(asleep, nowMs);
+            if (!asleep) syncReaction(nowMs);
+            Serial.println(asleep ? "DP1 OK sleeping=1" : "DP1 OK sleeping=0");
+            break;
+        }
+        case deskpet_wire::Action::Invalid:
+            Serial.println("DP1 ERR code=bad_request");
+            break;
+    }
+    return true;
+}
+
 void handleCommand(const char* command, uint32_t nowMs) {
+    if (handleDeviceProtocol(command, nowMs)) return;
     if (strcmp(command, "help") == 0) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic unibrow scruffy sideeye puffed goofy");
         Serial.println("Comic preview: comic next (Nerd, Derp, Gremlin, Panic, Unibrow, Scruffy, SideEye, Puffed, Goofy)");
@@ -347,6 +418,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Wear: wear beanie/partyhat/glasses/mustache/bowtie/crown/shades/starpin");
         Serial.println("Finds: find status | find reset | find grant crown/shades/starpin");
         Serial.println("Save: save status | save on/off | save now | save reset confirm");
+        Serial.println("Mac companion: dp1 hello | dp1 ping | dp1 status | dp1 emotion <name> | dp1 sleep/wake");
         return;
     }
     if (strcmp(command, "ping") == 0) {

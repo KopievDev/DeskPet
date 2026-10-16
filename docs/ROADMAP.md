@@ -1,3 +1,14 @@
+## macOS foundation — early 0.5 slice after firmware 0.1 (16 October 2026)
+
+- [x] Separate versioned `dp1` USB control/status protocol, bounded ASCII parser and host-testable `DeviceProtocol.h`
+- [x] Preserve legacy Serial commands for humans and `scripts/deskpet_activity.py` / xcodebuild wrapper
+- [x] Status exposes current/manual expression, sleep, personality and basic care meters without NVS changes
+- [ ] Create **KopievDev/DeskPet-macos** as an independent macOS SwiftUI menu bar repo; migrate starter into it
+- [ ] Implement USB CDC port discovery, connect/disconnect and DP1 line codec in macOS starter
+- [ ] Real Mac/ESP32 pairing test, port ownership, disconnected/reconnect, firmware reset-on-open handling and UI status
+- [ ] Later: portable `PetTransport`, Wi-Fi/WebSocket auth, heartbeat/replay protection, Xcode GUI events, AI, Virtual DeskPet
+- [ ] Before Phase 0.2 BLE: verify firmware PlatformIO and display interactions on actual IPS board
+
 ## Comic micro-stories — added to PR #2 (16 October 2026)
 
 - [x] Three fixed scripts: Suspicious, Bedhead, Meltdown, using 3–4 emotions each

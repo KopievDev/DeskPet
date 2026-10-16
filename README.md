@@ -1,3 +1,19 @@
+## Mac companion protocol — DP1/USB (16 October 2026)
+
+The firmware exposes a small, versioned ASCII channel for the planned standalone macOS menu bar app, without disturbing existing Serial commands. Send each command followed by LF at **115200 baud**:
+
+```text
+dp1 hello
+dp1 ping
+dp1 status
+dp1 emotion goofy
+dp1 emotion neutral
+dp1 sleep
+dp1 wake
+```
+
+Responses are single lines starting with `DP1`: e.g. `DP1 HELLO version=1 ...`, `DP1 PONG`, `DP1 STATUS emotion=neutral manual=neutral sleeping=0 ...`, `DP1 OK emotion=goofy`, or `DP1 ERR code=bad_request`. Unknown requests are rejected; legacy `neutral`, `status`, `event build-success` and `event user-active` still work. Port may be opened by only one client at a time. This first local USB version has no authentication: it is not a network endpoint. For a standalone macOS app, see the sibling repository planned as `KopievDev/DeskPet-macos` and the starter archive shared separately. Validation: `firmware/tests/device_protocol_test.cpp` and `firmware/tests/check_face_assets.py`.
+
 ## Comic Mini-Stories — multi-beat sketches (16 October 2026)
 
 DeskPet can now perform **three cartoon micro-stories** using the existing 26 facial emotions and `ReactionController`. Each story consists of timed beats, not a new animation engine:
