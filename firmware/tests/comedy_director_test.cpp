@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <initializer_list>
 
 #include "ComedyDirector.h"
 
@@ -86,6 +87,7 @@ int main() {
     // and cannot alter the game scores sent to the method.
     Director preview;
     preview.begin(15u, 19u);
+    last = Emotion::Count;
     for (uint32_t now = 15u; now < 3015u; now += 3u) {
         assert(preview.preview(now, Personality::Cheeky,
                                12u, 20u, 8u, 95u, x));
