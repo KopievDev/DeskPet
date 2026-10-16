@@ -1,3 +1,38 @@
+## Collectible rare accessories — 16 October 2026
+
+DeskPet keeps **five starting items** (beanie, party hat, glasses, mustache and bow tie) and now has **three unlockable rares**: a golden crown, dark shades and a golden star pin. All progress lives in RAM and resets on restart; no NVS, account, or network access.
+
+Each **third successful build**, **fourth `needs play`**, or **fifth real USER hold** qualifies for one rare find, limited to **one rare reward per 60 seconds**. The reward is selected from the remaining locked items using a separate PRNG (no impact on the ambient animation RNG). No reward on build failures or passive idling. A small 3.6-second **NEW!** badge and a Serial announcement acknowledge a find. The five starter items still work unchanged.
+
+```text
+inventory
+find status
+find reset
+find grant crown
+find grant shades
+find grant starpin
+wear crown
+wear shades
+wear starpin
+wear random
+wear auto
+```
+
+`find grant <rare>` is a debug shortcut to test graphics. `wear <rare>` refuses locked items; `wear random` only draws from owned items. `find reset` clears rare inventory and the manual outfit; starter items remain. Auto mode incorporates rare items once earned: crown when mood is high, shades in Smug, star pin in Excited. Sleep hides all accessories.
+
+Local tests, with CI left untouched:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/pet_finds_test.cpp -o /tmp/deskpet-finds-test
+/tmp/deskpet-finds-test
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/accessory_wardrobe_test.cpp -o /tmp/deskpet-wardrobe-test
+/tmp/deskpet-wardrobe-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
 ## DeskPet accessories · wardrobe (16 October 2026)
 
 Five playful, zero-storage accessories across three slots: **head** (beanie, party hat), **eyes** (wireframe glasses), and **face** (mustache, bow tie). All items are available from the start; wearing a new item replaces only that slot. The auto wardrobe is enabled on boot and reacts to energy, mood, attention, chosen emotion, and Calm/Playful/Cheeky personality. It avoids duplicate Nerd glasses. Sleep hides props and restores the previous outfit on wake. Pure C++11 state and RGB565 drawing in the existing canvas; no new sprites, heap, NVS, sensors, or network use.
