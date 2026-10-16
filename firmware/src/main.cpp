@@ -403,7 +403,10 @@ void handleCommand(const char* command, uint32_t nowMs) {
         return;
     }
     if (strcmp(command, "wear random") == 0) {
-        wardrobe.surprise();
+        wardrobe.surprise(
+            finds.owns(deskpet_finds::Prize::Crown),
+            finds.owns(deskpet_finds::Prize::Shades),
+            finds.owns(deskpet_finds::Prize::StarPin));
         Serial.println("Surprise outfit equipped");
         return;
     }
