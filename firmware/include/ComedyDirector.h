@@ -19,9 +19,11 @@ class Director {
 public:
     static constexpr uint32_t kSceneDurationMs = 4800u;
 
-    void begin(uint32_t nowMs, uint32_t seed = 0xC0B1C0DEu) {
+    void begin(uint32_t nowMs, uint32_t seed = 0xC0B1C0DEu,
+               Personality personality = Personality::Calm) {
         rng_ = seed == 0u ? 0xC0B1C0DEu : seed;
         enabled_ = true;
+        personality_ = personality;
         count_ = 0u;
         lastEmotion_ = Emotion::Count;
         reset(nowMs);
@@ -59,11 +61,16 @@ public:
         previousMs_ = nowMs;
         elapsedEligibleMs_ = 0u;
         wasEligible_ = false;
-        intervalMs_ = nextInterval(Personality::Calm);
+        intervalMs_ = nextInterval(personality_);
     }
 
     void setEnabled(bool enabled, uint32_t nowMs) {
         enabled_ = enabled;
+        reset(nowMs);
+    }
+
+    void setPersonality(Personality personality, uint32_t nowMs) {
+        personality_ = personality;
         reset(nowMs);
     }
 
@@ -81,6 +88,10 @@ public:
               uint8_t affection, Cue& cue) {
         const uint32_t delta = nowMs - previousMs_;
         previousMs_ = nowMs;
+        if (personality != personality_) {
+            setPersonality(personality, nowMs);
+            return false;
+        }
         if (!enabled_ || !eligible) {
             wasEligible_ = false;
             return false;
@@ -157,6 +168,7 @@ private:
     void emit(uint32_t nowMs, Personality personality,
               uint8_t energy, uint8_t mood, uint8_t attention,
               uint8_t affection, Cue& cue) {
+        personality_ = personality;
         const Emotion selection =
             select(personality, energy, mood, attention, affection);
         lastEmotion_ = selection;
@@ -174,6 +186,7 @@ private:
     uint32_t intervalMs_ = 100000u;
     uint32_t count_ = 0u;
     Emotion lastEmotion_ = Emotion::Count;
+    Personality personality_ = Personality::Calm;
     bool enabled_ = true;
     bool wasEligible_ = false;
 };
