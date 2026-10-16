@@ -1,5 +1,756 @@
-# DeskPet
+## Collectible rare accessories — 16 October 2026
 
-Настольный робот-компаньон на LILYGO T-Display-S3 (ESP32-S3).
+DeskPet keeps **five starting items** (beanie, party hat, glasses, mustache and bow tie) and now has **three unlockable rares**: a golden crown, dark shades and a golden star pin. All progress lives in RAM and resets on restart; no NVS, account, or network access.
 
-Проект в начале разработки. Первая прошивка появится через pull request.
+Each **third successful build**, **fourth `needs play`**, or **fifth real USER hold** qualifies for one rare find, limited to **one rare reward per 60 seconds**. The reward is selected from the remaining locked items using a separate PRNG (no impact on the ambient animation RNG). No reward on build failures or passive idling. A small 3.6-second **NEW!** badge and a Serial announcement acknowledge a find. The five starter items still work unchanged.
+
+```text
+inventory
+find status
+find reset
+find grant crown
+find grant shades
+find grant starpin
+wear crown
+wear shades
+wear starpin
+wear random
+wear auto
+```
+
+`find grant <rare>` is a debug shortcut to test graphics. `wear <rare>` refuses locked items; `wear random` only draws from owned items. `find reset` clears rare inventory and the manual outfit; starter items remain. Auto mode incorporates rare items once earned: crown when mood is high, shades in Smug, star pin in Excited. Sleep hides all accessories.
+
+Local tests, with CI left untouched:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/pet_finds_test.cpp -o /tmp/deskpet-finds-test
+/tmp/deskpet-finds-test
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/accessory_wardrobe_test.cpp -o /tmp/deskpet-wardrobe-test
+/tmp/deskpet-wardrobe-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+## DeskPet accessories · wardrobe (16 October 2026)
+
+Five playful, zero-storage accessories across three slots: **head** (beanie, party hat), **eyes** (wireframe glasses), and **face** (mustache, bow tie). All items are available from the start; wearing a new item replaces only that slot. The auto wardrobe is enabled on boot and reacts to energy, mood, attention, chosen emotion, and Calm/Playful/Cheeky personality. It avoids duplicate Nerd glasses. Sleep hides props and restores the previous outfit on wake. Pure C++11 state and RGB565 drawing in the existing canvas; no new sprites, heap, NVS, sensors, or network use.
+
+```text
+inventory
+wear status
+wear beanie
+wear glasses
+wear mustache
+wear partyhat
+wear bowtie
+wear random
+wear clear
+wear auto
+wear off
+wear on
+```
+
+`wear auto` chooses props from pet state. Manual `wear <item>` equips an item and switches to manual mode; `wear random` assembles a reproducible local-PRNG surprise outfit. `wear off` hides props without deleting the manual outfit; `wear on` restores manual mode. All customization is RAM-only and resets on restart.
+
+Host check (run locally, CI not required):
+
+```bash
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/accessory_wardrobe_test.cpp -o /tmp/deskpet-wardrobe-test
+/tmp/deskpet-wardrobe-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+# DeskPet 🐾
+
+Настольный робот-компаньон на **LILYGO T-Display-S3 (ESP32-S3, LCD 320 × 170)**. Цель — живой персонаж с локальной анимацией, а позднее голосом, AI-провайдерами (OpenAI / Gemini / Ollama), интеграцией с Mac, напоминаниями и умным домом.
+
+## Статус
+
+**Firmware 0.1 — первый прототип.** Работает без Wi-Fi, API-ключей, дополнительных плат и датчиков. Показывает анимированные глаза, моргает, меняет направление взгляда и реагирует на кнопки. Первый лог локальной сборки обнаружил несовместимость исходного заголовка LILYGO с LovyanGFX 1.2.33; драйвер исправлен в проекте, **повторная сборка и работа на физической плате пока не подтверждены**.
+
+> Этот профиль рассчитан на **обычную T-Display-S3 с TFT LCD**, не Touch, AMOLED или Pro. Для других ревизий потребуется отдельный display profile.
+
+## Прошивка через терминал (macOS)
+
+Для macOS с Homebrew рекомендуем **PlatformIO CLI через Homebrew**. Не используйте `pip install --user` с Homebrew Python: в современных версиях он может завершиться `externally-managed-environment` (PEP 668).
+
+```bash
+brew install platformio
+pio --version
+```
+
+Клонировать ветку первого прототипа и собрать:
+
+```bash
+git clone https://github.com/KopievDev/DeskPet.git
+cd DeskPet
+git switch feat/firmware-animated-face
+pio run -d firmware -e tdisplay_s3
+```
+
+Если репозиторий уже клонирован, достаточно начать с `cd DeskPet` (если вы не в нём) и `pio run -d firmware -e tdisplay_s3`.
+
+Подключить плату USB-C (кабель для передачи данных), затем:
+
+```bash
+pio device list
+pio run -d firmware -e tdisplay_s3 -t upload
+pio device monitor -d firmware -b 115200
+```
+
+При нескольких портах добавить `--upload-port /dev/cu.usbmodemXXXX` для `run`, а в monitor — `-p /dev/cu.usbmodemXXXX`. Если загрузка не начинается: удерживать BOOT, кратко нажать RST, отпустить BOOT и повторить upload.
+
+**Если Homebrew недоступен**, можно установить PlatformIO в отдельное Python-окружение:
+
+```bash
+python3 -m venv ~/.venvs/platformio
+~/.venvs/platformio/bin/python -m pip install -U platformio
+~/.venvs/platformio/bin/pio run -d firmware -e tdisplay_s3
+```
+
+## Повторная сборка после исправления дисплея
+
+Если при первой сборке возникла ошибка `Bus_Parallel8::config_t has no member named i2s_port`, обновите ветку и пересоберите проект. В DeskPet используется собственный адаптер дисплея, сохраняющий **оригинальные пины LILYGO**, и зафиксирован `LovyanGFX 1.2.33`.
+
+```bash
+git pull --ff-only
+pio run -d firmware -e tdisplay_s3 -t clean
+pio run -d firmware -e tdisplay_s3
+```
+
+Не нужно менять `cfg.i2s_port` вручную в каталоге `.pio/` — временное изменение пропадёт при следующей установке зависимостей.
+
+## Новые эмоции и дерзкие комикс-реплики
+
+## Tamagotchi-потребности: энергия, настроение и внимание
+
+DeskPet получил три **игровых** показателя (не реальные метрики пользователя). Они живут только в RAM ESP32 и после перезагрузки возвращаются к исходным значениям:
+
+| Показатель на LCD | Старт | Изменение |
+|---|---:|---|
+| **E** — Energy / энергия | 78 | −1 за 4 минуты бодрствования, **+1 за минуту сна** |
+| **M** — Mood / настроение | 70 | −1 за 9 минут бодрствования, повышается от заботы и успешных сборок |
+| **T** — Attention / внимание | 65 | −1 за 4 минуты бодрствования, повышается от взаимодействий |
+
+Новые значения выводятся рядом с привязанностью `A:50` в нижней полосе экрана. Диапазон — строго **0–100**. Сон восстанавливает энергию и приостанавливает снижение внимания/настроения, без резких скачков при переключении.
+
+**Забота:** удержание USER («погладить») повышает M на 12 и T на 20; короткое нажатие повышает T на 3; двойное — M на 4 и T на 8. Успех сборки даёт +5 к M, ошибка −6 к M и −1 к E. Команда `needs coffee` добавляет +25 к E и +5 к M, `needs play` добавляет +10 к M и +18 к T при расходе 3 энергии. Это виртуальные игровые действия: ESP32 не знает, пьёшь ли ты настоящий кофе.
+
+Когда питомец свободен, бодрствует и выбрана **Neutral**, он может **раз в ~90 секунд** намекнуть на неудовлетворённую потребность. Приоритет низкий — пользовательские эмоции, сон, Mac idle, события Xcode, Demo и активные скетчи не перебиваются:
+
+- **E ≤ 25:** Nerd показывает забавную чашку кофе с паром — «подзаряди меня!».
+- **T ≤ 25:** Derp или Gremlin подпрыгивает с восклицательным знаком — хочет внимания.
+- **M ≤ 25:** Bewildered показывает маленькую звезду — нуждается в весёлой игре.
+
+Эти короткие сценки длятся **4,8 секунды** и возвращают вручную выбранную эмоцию. DeskPet **не засыпает принудительно** из-за низкой энергии.
+
+Команды Serial Monitor (115200):
+
+```text
+needs status
+needs reset
+needs off
+needs on
+needs coffee
+needs play
+needs set 15 70 60
+needs show coffee
+needs show attention
+needs show cheer
+status
+```
+
+`needs set E M T` принимает значения от 0 до 100 и пригодится для тестов низких порогов без многочасового ожидания. `needs show ...` — немедленное ручное превью, не изменяет значения. `needs off` останавливает изменение потребностей и их автоматические шутки (старые эмоции работают как прежде).
+
+Проверить на Mac:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/pet_needs_test.cpp -o /tmp/deskpet-needs-test
+/tmp/deskpet-needs-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+После прошивки проверь `needs show coffee`, `needs show attention`, `needs show cheer`, а затем `needs status`. При низкой энергии значок чашки должен помещаться слева от глаз и не перекрывать нижний HUD. Нативную плавность на IPS и сборку PlatformIO требуется проверить на устройстве.
+
+## Комедийная реакция на активность Mac (опционально)
+
+**DeskPet не умеет самостоятельно узнавать, работал ли ты за компьютером** — ESP32-S3 не видит клавиатуру macOS. Для этого добавлен **необязательный локальный помощник** `scripts/deskpet_activity.py` на Python 3 без сторонних библиотек. Он читает только системный счётчик `HIDIdleTime` (количество секунд с последнего ввода), **не перехватывает клавиши, не читает приложения, окна, названия файлов и не отправляет ничего в сеть**. Помощник нужно запустить вручную; без него все прежние функции DeskPet остаются без изменений.
+
+| Ситуация | Реакция |
+|---|---|
+| Mac сообщил `event user-idle` | Если DeskPet свободен и выбран Neutral — на три секунды покажет скучающий **Bored** |
+| Пользователь не возвращается | Примерно раз в 90 секунд персонаж может строить редкие рожицы **Nerd / Derp / Gremlin** в зависимости от характера |
+| Mac сообщил `event user-active` после отсутствия от 10 секунд | **Excited**, либо **Love** при высокой привязанности, либо **Derp** у Cheeky |
+| Первая связь с помощником | Только фиксация состояния, без случайной реакции при запуске |
+| Сон, ручная эмоция, Xcode build, демонстрация | Не перебиваются, отложенная реакция на возвращение отменяется через 12 секунд |
+
+Все эффекты возвращают прежнюю выбранную эмоцию. PetBond не создаёт собственные случайные шутки, пока Mac сообщает AWAY, чтобы анимации не мешали друг другу. Продолжительность появления Bored/Excited/Love — 3 с, полноценных комичных сцен — 4,8 с.
+
+**1. Найди порт** подключённого ESP32:
+
+```bash
+ls /dev/cu.usb*
+```
+
+**2. Закрой Serial Monitor** (`pio device monitor`) и запусти помощник — одновременно порт обычно открывать нельзя:
+
+```bash
+python3 scripts/deskpet_activity.py --port /dev/cu.usbmodem101 --idle-seconds 90
+```
+
+Замени `/dev/cu.usbmodem101` на порт своей платы. Порог — 90 секунд; опрос каждые 4 секунды. Запуск осуществляется только по желанию и прекращается через `Ctrl+C`. Используется встроенный macOS `ioreg`; внешние сервисы не требуются. Учти, что некоторые USB-подключения ESP32 могут перезапустить плату при открытии порта.
+
+Для проверки **без платы**:
+
+```bash
+python3 scripts/deskpet_activity.py --simulate 0,60,100,150,1
+python3 -m unittest discover -s scripts -p 'test_*.py'
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/user_activity_test.cpp -o /tmp/deskpet-activity-test
+/tmp/deskpet-activity-test
+python3 firmware/tests/check_face_assets.py
+```
+
+Также можно вручную посылать команды в Serial Monitor, если не хочешь запускать macOS-помощник:
+
+```text
+event user-active
+event user-idle
+event user-active
+activity status
+activity off
+activity on
+```
+
+`activity off` отключает реакцию прошивки на сообщения Mac; `activity on` снова включает её. Команда `status` выводит `computer: ACTIVE/AWAY/UNKNOWN`. Данные о действиях и состоянии компьютера не сохраняются в Flash.
+
+## Шутки на ошибки сборки — Build Comedy
+
+DeskPet теперь реагирует на **последовательность** событий Xcode, а не только на одно успешное/неуспешное завершение. Внешний отправитель по-прежнему использует те же Serial-команды — никаких изменений в Mac-интеграции не требуется:
+
+| Событие | Реакция | Длительность |
+|---|---|---|
+| Первая ошибка сборки | **Panic** — дрожащие глаза, неровные зубы, пот | 4,8 с |
+| Вторая подряд ошибка | **Gremlin** — хитрая зубастая ухмылка | 4,8 с |
+| Третья и следующие ошибки | Чередование **Furious** и **Gremlin** | 4,5/4,8 с |
+| Первая успешная сборка после ошибок | **Nerd** — победоносно поправляет очки | 4,8 с |
+| Обычная успешная сборка | **Excited** — искры и радость | 4,5 с |
+
+Ошибки считаются одной серией, если между соседними ошибками прошло не больше **10 минут**. Успешная сборка сразу сбрасывает счётчик; после долгой паузы новая ошибка опять начинается с Panic. Механика полностью локальная, счётчик не хранится во Flash.
+
+Приоритеты сохранены: сборка **игнорируется во сне**, ручная эмоция/кнопка может сразу отменить временный скетч, а по его завершении возвращается вручную выбранная эмоция. PetBond по-прежнему начисляет +2 за успех и −1 за ошибку.
+
+Для проверки можно ввести команды по очереди (дождаться соответствующей реакции не обязательно):
+
+```text
+event build-failure
+event build-failure
+event build-failure
+event build-success
+event build-success
+build status
+build reset
+```
+
+Команда `status` тоже показывает текущую серию ошибок сборки. `build reset` сбрасывает только её историю — настройки и эмоции пользователя не меняет.
+
+Host-тест и прошивка:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/build_comedy_test.cpp -o /tmp/deskpet-build-comedy-test
+/tmp/deskpet-build-comedy-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+## Комедийные мини-сценки (Comic Skits)
+
+**Nerd, Derp, Gremlin и Panic** теперь не просто показывают статичную гримасу, а разыгрывают короткую **4,8-секундную сценку**, которая повторяется, пока активна соответствующая эмоция:
+
+| Эмоция | Мини-сценка |
+|---|---|
+| `nerd` | Поправляет оправу очков вверх, косит взглядом на линзу, показывает короткий блик и возвращает оправу на место |
+| `derp` | Сначала косит глазами к носу, затем глуповато разводит зрачки и с запозданием высовывает язык набок |
+| `gremlin` | Медленно растягивает клыкастую ухмылку, переводит зрачки внутрь и на мгновение сверкает маленькой искоркой |
+| `panic` | Быстро стучит зубами, нервно двигает глазами, а капли пота плавно появляются, стекают и исчезают перед повторением |
+
+Все фазы заданы в маленьком автономном **`firmware/include/ComicSkits.h`**: без `delay`, выделений памяти, новых графических буферов и вызовов `random()`. Зрачки и аксессуары используют одну временную шкалу, поэтому выражения выглядят связанно. Сон/моргание/переключение эмоций не блокируются, а автоматический PetBond cameo остаётся коротким и возвращает предыдущую эмоцию.
+
+Для демонстрации введи `comic next` в Serial Monitor — команда перебирает только **Nerd → Derp → Gremlin → Panic → Nerd**, отдельно от полного `demo on` на 21 эмоцию. Или выбери любой образ прямой командой `nerd`, `derp`, `gremlin`, `panic`.
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/comic_skits_test.cpp -o /tmp/deskpet-comic-skits-test
+/tmp/deskpet-comic-skits-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+Проверь на реальной T-Display-S3, что оправа и язык не задевают нижнюю подпись, блик не попадает на HUD, а повтор 4,8-секундной сценки не дёргается. Частота кадров и компиляция пока требуют локального подтверждения.
+
+## Юморный набор эмоций и привязанность (21 эмоция)
+
+У DeskPet появились **четыре новые комедийные эмоции**, которые специально нарисованы крупными, читаемыми формами для IPS 320×170:
+
+| Serial | Как выглядит |
+|---|---|
+| `nerd` | «Ботан»: толстые очки с бликами, иногда поправляет оправу, **два кривых передних зуба** |
+| `derp` | Нарочито асимметричные глаза, **косоглазие**, высунутый розовый язык, который покачивается |
+| `gremlin` | Хитрый прищур, **зубастая ухмылка с кривыми клыками**, зеленоватые акценты |
+| `panic` | Большие дрожащие глаза, нервная **зубастая улыбка** и анимированная капля пота |
+
+Всего **21 эмоция**. Для комикс-аксессуаров используются короткие переходы через моргание: очки, язык и зубы не должны резко перескакивать на новый рисунок. Новые команды доступны через Serial, цикл USER и `demo on` (перебирает все 21). Реплики на русском используют существующий пиксельный шрифт; **`sass off` по умолчанию**, в том числе для Gremlin/Panic.
+
+### Pet Bond — настроение от внимания
+
+Добавлен небольшой локальный **счёт привязанности 0–100**, изначально **50**. На нижней панели он обозначен `A:50`. Это игровая механика, а не AI и не оценка человека:
+
+- Длинное удержание USER («поглаживание») даёт **+9**.
+- Двойное USER даёт **+2**, обычное нажатие — **+1**, но не чаще раза в 1,8 с.
+- Успешная сборка — **+2**, неуспешная — **−1**.
+- При долгом отсутствии внимания — очень медленное снижение **−1 за 10 минут бодрствования**; во сне этот отсчёт приостанавливается.
+- Периодически, примерно раз в **55–85 секунд спокойной Neutral**, DeskPet может сам показать **Nerd, Derp, Gremlin или Panic** на 2,7 с. Выбор зависит от профиля Calm/Playful/Cheeky и уровня привязанности. После этого возвращается выбранная эмоция.
+- **Ручные действия, сон, деморежим, реакции Xcode и Bored всегда важнее автоматических шуток.** Существующие анимации, частицы и переходы сохранены.
+
+Управление без дополнительного приложения:
+
+```text
+nerd
+derp
+gremlin
+panic
+bond status
+bond off
+bond on
+bond reset
+status
+demo on
+```
+
+Команда `bond off` выключает **самопроизвольные комические появления**, но не поглаживание и не изменение счёта. `bond reset` возвращает привязанность к 50. **Всё хранится только в RAM**: после перезапуска опять будет 50, без профиля пользователя или облака.
+
+Проверки на Mac:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/pet_bond_test.cpp -o /tmp/deskpet-bond-test
+/tmp/deskpet-bond-test
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/reaction_controller_test.cpp -o /tmp/deskpet-reaction-test
+/tmp/deskpet-reaction-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+Проверь каждую из четырёх эмоций на IPS, переходы между ними, затем удержание USER, `bond status`, `personality cheeky` и спокойную Neutral примерно на полторы минуты. Нужна локальная аппаратная проверка формы очков/зубов, плавности, памяти и FPS; CI в этой ветке не запускаем.
+
+## Кнопки без Serial: двойной клик, поглаживание и характер
+
+Для стандартной **LILYGO T-Display-S3** теперь поддерживаются короткие, двойные и длительные нажатия двух физических кнопок. Touch-датчик **не требуется**: «погладить» питомца можно удержанием USER.
+
+| Кнопка и жест | Что делает |
+|---|---|
+| **USER / GPIO14** — один короткий клик | Следующая из **21 эмоций**, как раньше |
+| **USER** — два быстрых клика (до 320 мс между ними) | Временное **Surprised** на 2,3 с, потом возврат к выбранной эмоции |
+| **USER** — удержание 850 мс | **Погладить:** Love с красными сердечками на 3,2 с, затем восстановление выбранной эмоции |
+| **BOOT / GPIO0** — короткий клик | Заснуть / проснуться, как раньше |
+| **BOOT** — удержание 850 мс | Переключить характер по кругу **Calm → Playful → Cheeky → Calm**, не меняя состояние сна |
+
+Защита от дребезга — 35 мс. Для USER одиночный клик определяется **после окна двойного клика (~320 мс)**; для BOOT один короткий клик подтверждается сразу после отпускания. Удержание срабатывает **один раз**, не вызывает дополнительного короткого клика при отпускании. Смена характера с BOOT не включает `sass`/ругательства, даже при выборе Cheeky. Ручные жесты отменяют временные реакции Xcode и деморежим. Нажатие USER, когда питомец спит, пробуждает его.
+
+**Важно для прошивки:** GPIO0/BOOT участвует в выборе режима загрузки ESP32-S3. **Не удерживай BOOT при перезагрузке**, если не требуется режим прошивки. Нажатие в уже работающей прошивке обрабатывается как обычная кнопка; если BOOT был зажат во время запуска, обработчик не трактует его как жест до отпускания.
+
+C++-тесты распознавания жестов и временных реакций:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/button_gesture_test.cpp -o /tmp/deskpet-button-test
+/tmp/deskpet-button-test
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/reaction_controller_test.cpp -o /tmp/deskpet-reaction-test
+/tmp/deskpet-reaction-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+На плате сначала попробуй USER один раз и дважды быстро, затем удержи USER; дождись возврата к прежней эмоции. Удержание BOOT должно менять CALM/PLAY/CHEEKY в правом верхнем углу **без засыпания**. После короткого BOOT проверь сон/пробуждение. Тайминги ещё нужно проверить на реальном устройстве.
+
+## Загрузка, засыпание и пробуждение DeskPet
+
+Лицо теперь не появляется на LCD мгновенно. После питания DeskPet плавно просыпается: сначала видны прикрытые глаза, затем они постепенно раскрываются, сверху ненадолго показывается **HELLO!** и по сторонам мигают небольшие звёздочки. Приветствие длится **1,6 секунды** и не блокирует кнопки или Serial.
+
+По команде `sleep` либо нажатию **BOOT** веки закрываются примерно за **850 мс**. Во сне глаза остаются линиями, сбоку медленно поднимаются маленькие **z/Z**. Команда `wake` или повторное нажатие BOOT раскрывает глаза примерно за **1,05 секунды**, с лёгким вертикальным «потягиванием» и надписью **HI!**. Возвращается прежняя выбранная эмоция, а не всегда Neutral.
+
+Всё реализовано через независимый `FaceLifecycle.h` без блокирующих задержек и дополнительного графического буфера. Если быстро нажимать BOOT во время закрытия/открытия, направление меняется **с текущей открытости глаз** — без резкого скачка. Выбор эмоции во время приветствия отменяет заставку; события сборки во время сна по-прежнему игнорируются. Моргание, анимированные брови, Love/Furious и прочие эмоции сохранены.
+
+`status` теперь показывает фазу `BOOTING`, `AWAKE`, `FALLING_ASLEEP`, `ASLEEP` или `WAKING`.
+
+Проверка логики на Mac:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/face_lifecycle_test.cpp -o /tmp/deskpet-lifecycle-test
+/tmp/deskpet-lifecycle-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+Для проверки на плате перезапусти питание (приветствие), затем введи в Serial Monitor 115200: `love`, `sleep`, `status`, `wake`, `status`. Быстро чередуй `sleep` и `wake`, а также проверь кнопку BOOT. Важно визуально подтвердить, что зевки/брови/слова не перекрываются и FPS не проседает; аппаратная сборка здесь ещё не подтверждена.
+
+## Эмоциональные частицы: искры, сердечки и пар
+
+Для трёх эмоций добавлены локальные частицы, которые ненавязчиво поднимаются **по внешним бокам глаз**, не закрывая зрачки и нижние надписи:
+
+| Эмоция | Частицы |
+|---|---|
+| `excited` | ✨ Маленькие мерцающие **золотые искры**, поднимающиеся вверх |
+| `love` | ❤️ Миниатюрные **красные сердечки** с узнаваемой формой и бликом |
+| `furious` | 💨 Тонкие прохладные струйки **пара** рядом с раскалёнными глазами |
+
+В любой момент отображается не больше **шести частиц** (по три с каждой стороны). Их координаты и прозрачность рассчитываются детерминированно, без `malloc`, второго спрайта, полноценного alpha-blend и лишних вызовов `random()`. Жизненный цикл частицы — около **2,4 секунды**, включая мягкое появление и затухание. Во сне эффекты скрываются, при моргании исчезают вместе с открытостью глаз, а остальные 18 эмоций остаются без частиц. Режим `sass on` для частиц не нужен.
+
+Обновление, host-тест и прошивка:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/emotion_particles_test.cpp -o /tmp/deskpet-particles-test
+/tmp/deskpet-particles-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+На IPS проверь `excited` → `love` → `furious` → `neutral` и `sleep`, а также переключения во время моргания. Ожидаем, что частицы не заходят на лицо, верхнюю комикс-реплику и нижний HUD; реальную плавность/частоту кадров проверяем на плате.
+
+## Furious — пульсирующее свечение глаз
+
+Когда DeskPet становится **Furious**, вокруг обоих алых глаз появляется мягкий **трёхслойный красный ореол**. Он усиливается при появлении эмоции короткой вспышкой (~320 мс), а затем «дышит» с периодом **1,2 секунды**. При моргании ореол тоже уменьшается, во сне он скрыт. Остальные эмоции (включая Angry и Love) не получают свечения.
+
+Реализация для IPS не использует дорогостоящий blur, прозрачный framebuffer или выделение памяти на каждом кадре: `FuryGlow.h` выводит лишь **три пары округлых обводок вокруг каждого глаза**, смешивая оттенки заранее в RGB565 с цветом фона. Брови, зрачки, красные/золотые молнии и лёгкая дрожь Furious сохраняются.
+
+Проверить на Mac:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/fury_glow_test.cpp -o /tmp/deskpet-fury-glow-test
+/tmp/deskpet-fury-glow-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+В Serial Monitor (115200) проверь `neutral`, `furious`, `angry`, `love`, `sleep` и `wake`. На реальном IPS важно убедиться, что красные кольца не перекрывают брови и нижнюю подпись, эффект заметен, FPS остаётся стабильным, а после переключения эмоции ореол исчезает.
+
+## Цветные злые эмоции: Angry и Furious
+
+В двух злых эмоциях теперь не только разные формы век, но и собственные цветовые палитры:
+
+| Команда | Глаза | Брови и акценты |
+|---|---|---|
+| `angry` | Янтарные `#FFD18B`, тёмно-коричневые зрачки | Оранжевые `#FF9A36` брови и короткие «стрессовые» штрихи |
+| `furious` | Алые `#FF3B55`, бордовые зрачки | Малиновые `#FF244A` брови и мерцающие красно-золотые молнии |
+
+Переход цвета при `neutral → angry → furious → neutral` плавно интерполируется (~0,5 секунды); сохраняются моргание, движение глаз, гневный наклон век и небольшая дрожь у Furious. **Только Angry и Furious** получают новые оттенки. Love по-прежнему кораллово-красный, а другие эмоции остаются в исходной палитре.
+
+Проверки:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/mood_palette_test.cpp -o /tmp/deskpet-mood-palette-test
+/tmp/deskpet-mood-palette-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+Через Serial Monitor (115200) последовательно отправь `neutral`, `angry`, `furious`, `love`. На IPS нужно подтвердить реальные цвета, контраст зрачков и плавность. На компьютере статически проверены значения RGB565 и подключения нового рендера.
+
+## Love: аккуратные красные сердечки
+
+По замечанию с фотографии обновили оба глаза в эмоции `Love`: теперь вместо двух кругов и треугольника используется **единая симметричная форма сердца** с закруглёнными верхними половинками, выемкой между ними и ровным нижним кончиком. Цвет — насыщенный тёплый **кораллово-красный `#FF5268` (RGB565 `0xFA8D`)** с небольшим светло-розовым бликом. Щёчки в Love тоже красные; другие эмоции сохраняют прежнюю палитру.
+
+Небольшая пульсация (~1,45 с) и закрытие глаз при моргании/переходе между эмоциями сохранены. Контур строится из компактной таблицы горизонтальных отрезков без по-пиксельного вычисления кривой.
+
+Проверка нового рисунка на Mac:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/heart_shape_test.cpp -o /tmp/deskpet-heart-test
+/tmp/deskpet-heart-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+В Serial Monitor отправить `love`, дождаться двух красных сердечек и проверить `love → neutral → love`. Геометрию на реальной IPS-плате, контраст красного и скорость отрисовки нужно подтвердить локально.
+
+
+
+Добавлены пять новых выражений и **Bewildered — всего 21 эмоций**:
+
+| Команда | Внешний вид |
+|---|---|
+| `smug` | Самодовольный прищур и кривая ухмылка |
+| `furious` | Очень сердитые брови, мелкая дрожь глаз и молнии |
+| `embarrassed` | Смущённо опущенный взгляд и «румянец» на щеках |
+| `dizzy` | Крутящиеся X-зрачки и разнонаправленные брови |
+| `bored` | Тяжёлые веки, взгляд в сторону и выражение скуки |
+| `bewildered` | Недоумение: правый зрачок медленно уплывает в сторону, замирает и возвращается; под мордочкой появляется капля слюны |
+
+**Новая анимация Bewildered:** задержка взгляда → 1,8 секунды смещения **только правого зрачка** вправо → короткая пауза → 1,8 секунды возврата. Полный цикл 4,8 секунды, повторяется без блокировок. Пока глаза недоумённо смотрят в разные стороны, между ними появляется крошечный ротик и растущая/исчезающая капля слюны. Моргание и управление эмоциями продолжают работать; никаких датчиков не требуется. Для ручной проверки введи `bewildered` в Serial Monitor или дождись этой эмоции в `demo on`.
+
+**Censored Comic Mode** — короткие комикс-фразы на **русском**, например `ИДИ НА Х#$#!!`, `НУ ВСЕ, БЛ#!!`, `ХЕ-ХЕ, ПОПАЛ!` и `ЧТО ЗА ДИЧЬ?`. Они отображаются в небольшой анимированной плашке над глазами около 2,5 секунды после смены эмоции и исчезают автоматически. Для русского текста встроен небольшой 8×12 пиксельный шрифт; стандартные шрифты LovyanGFX не обязаны поддерживать кириллицу.
+
+**Режим реплик по умолчанию ВЫКЛЮЧЕН.** Он включается только явно, не сохраняется после перезагрузки и не отправляет реплики ни в сеть, ни в Serial:
+
+```text
+sass on
+furious
+quip
+sass off
+```
+
+- `sass on` — разрешить цензурированные фразы.
+- `quip` — повторить фразу для текущей эмоции (если режим включён).
+- `sass off` — отключить и немедленно скрыть плашку.
+- `demo on` — показать все **16** эмоций автоматически (при включённом sass будут и реплики).
+- Базовые короткие нажатия USER и BOOT сохранены; добавлены двойной клик USER и удержания для временной эмоции и смены характера.
+
+Для эмоций с иной геометрией (Happy, Love, Playful, Dizzy) переключение делается через мягкое закрытие/открытие глаз. Furious слегка дрожит, у Dizzy меняется ориентация X-зрачков, у Embarrassed появляются точки-румянец. Все анимации неблокирующие.
+
+Обновление и прошивка:
+
+```bash
+git pull --ff-only
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+pio device monitor -d firmware -b 115200
+```
+
+Быстрая проверка списка эмоций, покрытия кириллицы и включения sass только по согласию (без сборки прошивки):
+
+```bash
+python3 firmware/tests/check_face_assets.py
+```
+
+Проверить на IPS: `sass on` → `furious`, затем `dizzy`, `embarrassed`, `smug`, `bored`. Убедиться, что реплика не закрывает глаза/брови, нет «кракозябр» и моргание остаётся плавным. Компиляция и FPS на реальной плате должны быть подтверждены локально.
+
+## Характер DeskPet: Calm, Playful и Cheeky
+
+Появились три **локальных профиля характера**, без внешнего приложения, сети, озвучки или AI. Они управляют тем, как часто и какими жестами DeskPet оживает в **Neutral**, а также тоном коротких комикс-реплик.
+
+| Профиль | Интервал микроанимаций | Стиль поведения | Реплики при `sass on` |
+|---|---|---|---|
+| `calm` — спокойный | **14–26 с** | Больше мягких взглядов и зевков, редко пугается | «ВСЕ ОК!», «НУ И ЛАДНО» |
+| `playful` — игривый | **6–12 с** | Чаще подмигивает, играет бровями и удивляется | «ХЕ-ХЕ, ПОПАЛ!», «ОЙ, БЛИН...» |
+| `cheeky` — дерзкий | **9–16 с** | Чаще щурится, подмигивает и дерзко смотрит | Исходные саркастические фразы, в том числе «ИДИ НА Х#$#!!» |
+
+В `Serial Monitor` отправь любую из команд (с концом строки LF):
+
+```text
+personality calm
+personality playful
+personality cheeky
+status
+```
+
+Текущий профиль показан в правом верхнем углу LCD: **CALM / PLAY / CHEEKY**. Переключение сразу отменяет незавершённую фоновую микроанимацию и планирует следующую с новой частотой, но **не сбрасывает вручную выбранную эмоцию**.
+
+**Важно:** режим `sass` остаётся **выключенным по умолчанию при любом профиле**. Выбор `cheeky` *не включает мат*. Реплики появляются только после отдельного `sass on`; `sass off` мгновенно их скрывает. Профиль и настройка `sass` не записываются во flash и при перезагрузке возвращаются к `calm` / `sass off`.
+
+Проверки на Mac:
+
+```bash
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/personality_test.cpp -o /tmp/deskpet-personality-test
+/tmp/deskpet-personality-test
+```
+
+Это пока только **лёгкие профили прошивки**; полноценный Personality Studio с редактором, сохранением, синхронизацией Mac/iPhone и AI-голосом остаётся в дальнейшей дорожной карте.
+
+## Микроанимации в режиме ожидания (Ambient Personality)
+
+Когда DeskPet находится в **Neutral** и не получает событий, он иногда сам оживает. Без дополнительного микрофона, AI, Wi-Fi и датчиков — всё рассчитывается локально на ESP32-S3.
+
+| Жест | Визуальный эффект |
+|---|---|
+| Look Left / Look Right | Оба зрачка мягко переводят взгляд, задерживаются и возвращаются |
+| Squint | Лёгкий задумчивый прищур |
+| Yawn | Глаза сонно закрываются, между ними появляется овальный ротик |
+| Startled | Быстрое удивление: зрачки и глаза увеличиваются, брови приподнимаются |
+| Brow Bounce | Короткий вопросительный подброс бровей |
+| Wink | Одно случайное (левое) подмигивание |
+
+По умолчанию (профиль `calm`) после **14–26 секунд** спокойствия случайно запускается один из **семи жестов** (оба направления взгляда считаются отдельно). Длительность — примерно 1,15–2,45 с. Вход/выход сглаживаются; жесты не меняют последнюю выбранную эмоцию и не выводят ругательства. Режим **включён по умолчанию**, но легко отключается через Serial:
+
+```text
+ambient off
+ambient on
+status
+```
+
+**Приоритеты:** Ambient работает только в Neutral. Если выбрать любую эмоцию кнопкой USER или через Serial, запустить `demo on`, отправить событие сборки, включить Sleep или дождаться автоматического Bored — текущий жест прекращается. После возвращения к Neutral новый жест запускается только после свежей паузы. Это независимый уровень анимации поверх ранее реализованного естественного моргания и случайных движений глаз.
+
+Локальные проверки без ESP32:
+
+```bash
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/idle_behavior_test.cpp -o /tmp/deskpet-ambient-test
+/tmp/deskpet-ambient-test
+```
+
+На реальной IPS-плате проверь `personality playful` + `neutral` + ожидание 15 секунд, затем `ambient off`, повторное `ambient on`, переход `event build-failure`, `demo on` и `sleep`. Скорость кадров и геометрию зевка предстоит подтвердить на устройстве.
+
+## Реакции на Xcode и бездействие (без macOS-приложения)
+
+Встроенный **ReactionController** показывает эмоции по событиям, не меняя выбранное вручную настроение навсегда:
+
+| Событие / команда | Реакция |
+|---|---|
+| `event build-success` | **Excited** на 4,5 секунды, затем возврат к прежней эмоции |
+| `event build-failure` | **Furious** на 4,5 секунды, затем возврат |
+| Отсутствие нажатий и команд 120 секунд | **Bored**, пока пользователь не взаимодействует с питомцем |
+| `idle off` / `idle on` | Отключение / включение автоматической скуки |
+| `idle 30` | Смена тайм-аута скуки на 30 секунд (допустимо 15–3600) |
+| `status` | Текущая эмоция, ручной выбор, тайм-аут, демо и sass |
+
+При любом ручном выборе эмоции временная реакция отменяется. Повторные события обновляют время реакции; управление остаётся неблокирующим. **Sleep не прерывается** событиями сборки: они игнорируются, пока питомец спит. `demo on` приостанавливает автоматическую скуку. После перезапуска используется тайм-аут 120 секунд с включённой автоматикой; отдельного постоянного хранилища настроек ещё нет.
+
+Пока прошивка понимает **Serial-события**, но не умеет самостоятельно читать журналы Xcode. Для ручной проверки открой монитор и отправь строки:
+
+```text
+event build-failure
+event build-success
+idle 15
+status
+idle off
+```
+
+**Реальная интеграция с терминальными сборками Xcode** через `scripts/xcodebuild-with-deskpet.sh`: сценарий запускает настоящий `xcodebuild` и передаёт событие **по коду завершения процесса**, а не по эвристике из текста лога. Сначала подключи DeskPet по USB и найди последовательный порт:
+
+```bash
+pio device list
+```
+
+Закрой Serial Monitor (чтобы порт не был занят) и запусти обычную сборку через обёртку на **macOS**. Вместо примеров проекта/схемы подставь свои:
+
+```bash
+DESKPET_PORT=/dev/cu.usbmodemXXXX bash scripts/xcodebuild-with-deskpet.sh \
+  -project MyApp.xcodeproj -scheme MyApp \
+  -destination 'generic/platform=iOS Simulator' build
+```
+
+В `DESKPET_PORT` укажи действительный порт твоей платы; **без переменной** скрипт просто запускает `xcodebuild`. Ошибка открытия порта не меняет статус сборки и печатает предупреждение. Это интеграция **только с `xcodebuild` из терминала**, не перехват сборок, запущенных кнопкой Run в Xcode — подключение к IDE добавим отдельно.
+
+Для проверки логики на компьютере без ESP32:
+
+```bash
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include \
+  firmware/tests/reaction_controller_test.cpp -o /tmp/deskpet-reaction-test
+/tmp/deskpet-reaction-test
+```
+
+Реплики с цензурированным матом подчиняются прежней настройке: **`sass off` по умолчанию**, в том числе для автоматических эмоций `Furious` и `Bored`. Реплика Bewildered (`ЭТО КАК?!`) тоже показывается только после `sass on`.
+
+## Плавные переходы между эмоциями
+
+Глаза теперь не меняются мгновенно при нажатии USER или отправке Serial-команды:
+
+- Для обычных форм (`neutral`, `curious`, `surprised`, `sleepy`, `angry`, `sad`, `confused`, `excited`) интерполируются **ширина, высота, открытость, размер зрачков и углы обоих верхних век**. В частности, увеличенные зрачки Surprised **вырастают постепенно**.
+- Для несовместимых силуэтов (**улыбки Happy, сердечки Love, подмигивание Playful**) выполняется плавное закрытие и повторное открытие глаз за ~360 мс. Изображение меняется в момент закрытия, чтобы не было резкого скачка.
+- Брови продолжают менять позу независимо и плавно. Очередная команда во время перехода не должна резко раскрывать глаза.
+- Моргание и всё управление продолжают работать без AI, сети и дополнительных компонентов.
+
+**Демо всех 21 эмоций без постоянного нажатия кнопки:** открой Serial Monitor на 115200 и отправь команду `demo on` с окончанием строки LF. Питомец переключает выражение каждые 1,8 секунды. `demo off` останавливает показ. Любое ручное нажатие USER/BOOT или команда конкретной эмоции останавливают демо.
+
+Обновить и прошить через терминал:
+
+```bash
+git pull --ff-only
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+pio device monitor -d firmware -b 115200
+```
+
+Проверить на физической плате: **neutral → surprised** (рост зрачков), **neutral → angry** (наклон век), **happy → love → playful** (переход через моргание), быстрые нажатия USER и `demo on`. Реальную плавность и FPS ещё нужно подтвердить.
+
+## Улучшенные эмоции (брови и форма глаз)
+
+В прошивке есть отдельные **анимированные брови**, которые плавно меняют высоту, изгиб и наклон. Линии глаз и век зависят от эмоции:
+
+| Команда в Serial | Внешний вид |
+|---|---|
+| `neutral` | Обычные глаза, спокойные брови |
+| `happy` | Выразительные улыбающиеся дуги, поднятые брови, небольшие акценты на щеках |
+| `curious` | Асимметричные брови, один глаз уже другого, наклонные верхние веки |
+| `surprised` | Широко раскрытые глаза, **значительно увеличенные зрачки**, высокие брови |
+| `sleepy` | Полуприкрытые глаза, расслабленные опущенные брови |
+| `angry` | Сердитые брови, направленные внутрь, строгие верхние веки, суженные зрачки |
+| `sad` | Грустные опущенные веки, наклонённые брови и движущаяся слеза |
+| `love` | Два пульсирующих глаза-сердечка и акценты на щеках |
+| `confused` | Одна поднятая бровь, разные по открытости глаза и взгляд в разные стороны |
+| `excited` | Большие радостные глаза, лёгкое подпрыгивание и мерцающие искры |
+| `playful` | Один подмигивающий глаз и весёлый второй глаз |
+| `sleep` / `wake` | Закрытые глаза / восстановление предыдущего выражения |
+
+**Обновление после изменений в PR #1:**
+
+```bash
+git pull --ff-only
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
+**Короткое одиночное нажатие USER (GPIO14)** последовательно перебирает **21 эмоций**; двойное нажатие и удержание дают отдельные реакции (см. раздел про кнопки выше). Для проверки точного выражения можно отправлять команды через `pio device monitor -d firmware -b 115200` (настроив отправку конца строки `LF`).
+
+Рендеринг по-прежнему целиком локальный, без Wi-Fi и AI; на реальном IPS-экране нужно проверить размер/положение бровей, плавность моргания и FPS.
+
+## Управление
+
+| Действие | Результат |
+|---|---|
+| **GPIO14 / USER** — короткое нажатие | Следующая эмоция |
+| **GPIO0 / BOOT** — короткое нажатие после загрузки | Сон / пробуждение |
+| USB Serial, 115200 бод | Команды `neutral`, `happy`, `curious`, `surprised`, `sleepy`, `angry`, `sad`, `love`, `confused`, `excited`, `playful`, `smug`, `furious`, `embarrassed`, `dizzy`, `bored`, а также `sleep`, `wake`, `next`, `demo on`, `demo off`, `sass on`, `sass off`, `quip`, `help` |
+
+**Примечание:** BOOT (GPIO0) — strapping pin. Не удерживать его при перезагрузке, кроме входа в режим прошивки.
+
+## Устройство проекта
+
+- `firmware/` — PlatformIO + Arduino framework + совместимый адаптер ST7789 из `firmware/include/DeskPetTDisplayS3.h` поверх LovyanGFX 1.2.33 (пины из официального профиля LILYGO), персонаж и управление.
+- `docs/ARCHITECTURE.md` — границы ответственности устройства, приложений и AI Gateway.
+- `docs/ROADMAP.md` — поэтапная разработка.
+
+Первые версии принципиально не нуждаются в интернете. API-ключи AI не будут храниться в прошивке ESP32. После аппаратной проверки добавим Wi-Fi, локальное сопряжение и macOS-клиент.
+
+Источники по плате: [официальная документация](https://wiki.lilygo.cc/products/t-display-series/t-display-s3/) и [LILYGO display library](https://github.com/Xinyuan-LILYGO/LilyGo-display-library) (источник исходной распиновки), [LovyanGFX](https://github.com/lovyan03/LovyanGFX) (графический движок).
+
+## Электрическая схема прототипа
+
+- [Схема подключения T-Display-S3, микрофона, усилителя, датчиков, PCA9685 и сервоприводов](docs/hardware/WIRING.md) (проектная, ещё не проверена на макете).
