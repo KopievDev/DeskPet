@@ -43,6 +43,10 @@ public:
     }
     void setNeedPrompt(deskpet_needs::Kind prompt) { needPrompt_ = prompt; }
     void setAccessories(deskpet_accessories::Outfit outfit) { accessories_ = outfit; }
+    void setFindNotice(deskpet_accessories::Item item, uint32_t nowMs) {
+        findNotice_ = item;
+        findNoticeStartedMs_ = nowMs;
+    }
 
     // Ambient gestures are visual-only: never replace the user's emotion.
     void setIdleGesture(IdleGesture gesture, uint32_t startedMs);
@@ -64,6 +68,7 @@ private:
     void drawComicFeatures(int eyeY, float openness);
     void drawNeedPrompt(int eyeY, float openness);
     void drawAccessories(int eyeY, float openness);
+    void drawFindNotice();
     float idleEnvelope() const;
     const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
@@ -128,6 +133,8 @@ private:
     uint8_t attention_ = 65u;
     deskpet_needs::Kind needPrompt_ = deskpet_needs::Kind::None;
     deskpet_accessories::Outfit accessories_ = deskpet_accessories::emptyOutfit();
+    deskpet_accessories::Item findNotice_ = deskpet_accessories::Item::None;
+    uint32_t findNoticeStartedMs_ = 0u;
     bool sassEnabled_ = false;
     bool quipVisible_ = false;
     uint32_t quipStartedMs_ = 0;
