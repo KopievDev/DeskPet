@@ -39,6 +39,10 @@ int main() {
     assert(newer(0u, 0xFFFFFFFFu));
     assert(!newer(0xFFFFFFFFu, 0u));
     assert(!newer(3u, 3u));
+    assert(preferA(true, 5u, false, 99u));
+    assert(!preferA(false, 5u, true, 99u));
+    assert(preferA(true, 0u, true, 0xFFFFFFFFu));
+    assert(!preferA(true, 42u, true, 43u));
 
     // Bit errors, wrong version, unexpected sizes, valid CRC with
     // semantically impossible inventory or progress are all rejected.
