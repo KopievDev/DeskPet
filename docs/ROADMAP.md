@@ -1,3 +1,15 @@
+## Autonomous comic micro-skits (added to PR #2, 16 October 2026)
+
+- [x] Independent C++11 comedy director, separate RNG and interrupt-safe transient scheduling
+- [x] Personality-weighted five-scene selection; also react to E/M/T and bond
+- [x] Eligible-time countdown prevents starvation by unrelated short skits
+- [x] Respect USER/BOOT, manually chosen mood, Mac-away, build events, Needs, PetBond, demo, sleep and active ambient gestures
+- [x] Return automatically to Neutral after 4.8 s; avoid repeating the same face
+- [x] Serial `comedy on/off/status/now`; status displays count and quiet-time remaining
+- [x] Deterministic host tests + source integration regression
+- [ ] Verify cameo timing, UX and 320×170 IPS legibility on hardware, and watch FPS
+- [ ] Future option: custom presets for which faces may appear automatically
+
 ## Comic Expressions Pack — implemented in PR #2 (16 October 2026)
 
 - [x] Five comically exaggerated new facial moods: Unibrow, Scruffy, SideEye, Puffed, Goofy
