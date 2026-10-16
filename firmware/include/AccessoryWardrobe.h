@@ -135,7 +135,8 @@ public:
     }
 
     // Separate PRNG; doesn't change eye movement, blinks or ambience RNG.
-    void surprise() {
+    void surprise(bool crownUnlocked = false, bool shadesUnlocked = false,
+                  bool starUnlocked = false) {
         rng_ ^= rng_ << 13;
         rng_ ^= rng_ >> 17;
         rng_ ^= rng_ << 5;
@@ -145,6 +146,9 @@ public:
         manual_.eyes = (value & 4u) != 0u ? Item::Glasses : Item::None;
         manual_.face = (value & 8u) != 0u ? Item::Mustache :
                        (value & 16u) != 0u ? Item::BowTie : Item::None;
+        if (crownUnlocked && (value & 32u)) manual_.head = Item::Crown;
+        if (shadesUnlocked && (value & 64u)) manual_.eyes = Item::Shades;
+        if (starUnlocked && (value & 128u)) manual_.face = Item::StarPin;
         if (isEmpty(manual_)) manual_.face = Item::BowTie;
         setMode(Mode::Manual);
     }
