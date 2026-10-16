@@ -464,6 +464,7 @@ assert 'strcmp(command, "save status")' in serial
 assert 'strcmp(command, "save now")' in serial
 assert 'strcmp(command, "save reset confirm")' in serial
 assert (ROOT / "tests/pet_progress_test.cpp").is_file()
+assert (ROOT / "tests/pet_progress_restore_test.cpp").is_file()
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
