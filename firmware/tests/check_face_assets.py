@@ -16,7 +16,7 @@ enum_match = re.search(r"enum class Emotion\s*:\s*uint8_t\s*\{(.*?)\}", header, 
 assert enum_match, "Emotion enum missing"
 emotions = re.findall(r"\b([A-Za-z]+)(?:\s*=\s*0)?\s*,", enum_match.group(1))
 emotions = [name for name in emotions if name != "Count"]
-assert len(emotions) == 21, f"Expected 21 emotions; got {len(emotions)}"
+assert len(emotions) == 26, f"Expected 26 emotions; got {len(emotions)}"
 
 for emotion in emotions:
     assert f"case Emotion::{emotion}: return" in source, f"Name missing: {emotion}"
@@ -52,7 +52,7 @@ assert "bewilderedOffset" in source, "Missing delayed pupil travel"
 assert "4800u" in source, "Missing return cycle of the drifting pupil"
 assert "mouthY + 3 + length" in source, "Missing animated drool drop"
 assert '"bewildered", Emotion::Bewildered' in serial, "Missing Serial command"
-assert "cycling all 21 emotions" in serial, "Wrong demo description"
+assert "cycling all 26 emotions" in serial, "Wrong demo description"
 
 
 reaction = (ROOT / "include/ReactionController.h").read_text(encoding="utf-8")
@@ -465,6 +465,24 @@ assert 'strcmp(command, "save now")' in serial
 assert 'strcmp(command, "save reset confirm")' in serial
 assert (ROOT / "tests/pet_progress_test.cpp").is_file()
 assert (ROOT / "tests/pet_progress_restore_test.cpp").is_file()
+
+# New cartoon faces: separate state curves, full Serial/USER/demo coverage.
+funny = (ROOT / "include/ComicExpressions.h").read_text(encoding="utf-8")
+assert "kSceneDurationMs = 4800u" in funny
+assert "inline Frame at(Emotion emotion, uint32_t elapsedMs)" in funny
+assert '#include "ComicExpressions.h"' in source
+assert "deskpet_comic_faces::at(" in source
+assert "const bool sideEye = visualEmotion_ == Emotion::SideEye;" in source
+assert "const bool goofy = visualEmotion_ == Emotion::Goofy;" in source
+for mood in ("Unibrow", "Scruffy", "SideEye", "Puffed", "Goofy"):
+    assert f"case Emotion::{mood}:" in funny, f"Missing animation: {mood}"
+    assert f"case Emotion::{mood}:" in source, f"Missing eye/brow pose: {mood}"
+    assert f"visualEmotion_ == Emotion::{mood}" in source, (
+        f"Missing on-screen details: {mood}"
+    )
+    assert f'Emotion::{mood}' in serial, f"Missing Serial mapping: {mood}"
+assert "sizeof(comicMoods) / sizeof(comicMoods[0])" in serial
+assert (ROOT / "tests/comic_expressions_test.cpp").is_file()
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
