@@ -1,3 +1,14 @@
+## Wardrobe and comic accessories — implemented in PR #1 (16 October 2026)
+
+- [x] Three independent accessory slots: head / eyes / face
+- [x] Beanie, party hat, wireframe glasses, mustache, bow tie
+- [x] Auto outfit by pet needs, emotion and personality; Nerd's built-in glasses protected
+- [x] Serial `inventory`, `wear status`, `wear <item>`, `wear auto/on/off/clear/random`
+- [x] Hide during sleep; restore on wake, no Flash writes, no extra framebuffer
+- [x] Pure host-testable C++11 Wardrobe and source-level regression checks
+- [ ] Verify accessory legibility, comic bubble overlap, FPS, and PlatformIO build on real 320×170 IPS
+- [ ] Later: unlockable finds, accessory icons/preview UI, persistence as opt-in
+
 # DeskPet — roadmap
 
 Настольный AI-компаньон для **ESP32-S3**. **Аппаратная стратегия: сейчас LILYGO T-Display-S3 с IPS LCD (ST7789V, 170×320), после успешного прототипа — отдельная версия на AMOLED (RM67162, 240×536).** Принципы: offline-first, приватность по умолчанию, модульная прошивка, работа с iPhone, Android и Mac.

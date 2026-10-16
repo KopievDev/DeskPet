@@ -12,6 +12,7 @@
 #include "BuildComedy.h"
 #include "UserActivity.h"
 #include "PetNeeds.h"
+#include "AccessoryWardrobe.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -27,6 +28,7 @@ PetBond bond;
 deskpet_build_comedy::Story buildStory;
 deskpet_activity::Controller userActivity;
 deskpet_needs::Controller needs;
+deskpet_accessories::Wardrobe wardrobe;
 IdleBehavior ambient;
 
 struct NamedEmotion {
@@ -180,6 +182,8 @@ void showStatus() {
     Serial.print(" T");
     Serial.print(needs.attention());
     Serial.print(needs.enabled() ? "" : " (off)");
+    Serial.print(" | wardrobe: ");
+    Serial.print(deskpet_accessories::modeName(wardrobe.mode()));
     Serial.print(" | build failures: ");
     Serial.print(buildStory.consecutiveFailures());
     Serial.print(" | sass: ");
@@ -210,6 +214,8 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Mac activity: event user-idle | event user-active | activity on/off/status");
         Serial.println("Needs: needs status/reset/on/off | needs coffee/play | needs set E M T");
         Serial.println("Needs debug: needs show coffee/attention/cheer");
+        Serial.println("Inventory: inventory | wear status | wear auto/on/off/clear/random");
+        Serial.println("Wear: wear beanie/partyhat/glasses/mustache/bowtie");
         return;
     }
     if (strcmp(command, "ping") == 0) {
@@ -294,6 +300,69 @@ void handleCommand(const char* command, uint32_t nowMs) {
         }
         Serial.print("Computer: ");
         Serial.println(deskpet_activity::presenceName(userActivity.presence()));
+        return;
+    }
+    if (strcmp(command, "inventory") == 0) {
+        Serial.println("Owned: beanie partyhat glasses mustache bowtie (RAM only)");
+        Serial.println("Slots: head | eyes | face. Wear one item per slot.");
+        return;
+    }
+    if (strcmp(command, "wear status") == 0) {
+        const auto outfit = wardrobe.outfit();
+        Serial.print("Wardrobe: ");
+        Serial.print(deskpet_accessories::modeName(wardrobe.mode()));
+        Serial.print(" | head: ");
+        Serial.print(deskpet_accessories::itemName(outfit.head));
+        Serial.print(" | eyes: ");
+        Serial.print(deskpet_accessories::itemName(outfit.eyes));
+        Serial.print(" | face: ");
+        Serial.println(deskpet_accessories::itemName(outfit.face));
+        return;
+    }
+    if (strcmp(command, "wear auto") == 0 ||
+        strcmp(command, "wear off") == 0 ||
+        strcmp(command, "wear on") == 0) {
+        const auto mode = strcmp(command, "wear auto") == 0
+            ? deskpet_accessories::Mode::Auto
+            : strcmp(command, "wear off") == 0
+                ? deskpet_accessories::Mode::Off
+                : deskpet_accessories::Mode::Manual;
+        wardrobe.setMode(mode);
+        Serial.print("Wardrobe mode: ");
+        Serial.println(deskpet_accessories::modeName(mode));
+        return;
+    }
+    if (strcmp(command, "wear clear") == 0 ||
+        strcmp(command, "wear none") == 0) {
+        wardrobe.clear();
+        Serial.println("Outfit cleared");
+        return;
+    }
+    if (strcmp(command, "wear random") == 0) {
+        wardrobe.surprise();
+        Serial.println("Surprise outfit equipped");
+        return;
+    }
+    if (strncmp(command, "wear ", 5) == 0) {
+        const char* name = command + 5;
+        deskpet_accessories::Item item = deskpet_accessories::Item::None;
+        if (strcmp(name, "beanie") == 0)
+            item = deskpet_accessories::Item::Beanie;
+        else if (strcmp(name, "partyhat") == 0)
+            item = deskpet_accessories::Item::PartyHat;
+        else if (strcmp(name, "glasses") == 0)
+            item = deskpet_accessories::Item::Glasses;
+        else if (strcmp(name, "mustache") == 0)
+            item = deskpet_accessories::Item::Mustache;
+        else if (strcmp(name, "bowtie") == 0)
+            item = deskpet_accessories::Item::BowTie;
+        else {
+            Serial.println("Use: wear beanie | partyhat | glasses | mustache | bowtie");
+            return;
+        }
+        wardrobe.equip(item);
+        Serial.print("Equipped: ");
+        Serial.println(deskpet_accessories::itemName(item));
         return;
     }
     if (strcmp(command, "needs status") == 0) {
@@ -576,6 +645,7 @@ void setup() {
     buildStory.begin();
     userActivity.begin(startedAt);
     needs.begin(startedAt);
+    wardrobe.begin(static_cast<uint32_t>(micros()) ^ 0x5C8330A1u);
     bond.begin(startedAt, static_cast<uint32_t>(micros()) ^ 0x682C95B3u);
     face.setAffection(bond.score());
     face.setNeeds(needs.energy(), needs.mood(), needs.attention());
@@ -645,6 +715,10 @@ void loop() {
     }
     face.setAffection(bond.score());
     face.setNeeds(needs.energy(), needs.mood(), needs.attention());
+    wardrobe.tick(reactions.desiredEmotion(), ambient.personality(),
+                 needs.energy(), needs.mood(), needs.attention(),
+                 face.isSleeping());
+    face.setAccessories(wardrobe.outfit());
     if (!reactions.reactionActive()) {
         face.setNeedPrompt(deskpet_needs::Kind::None);
     }

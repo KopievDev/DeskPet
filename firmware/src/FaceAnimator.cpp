@@ -1055,6 +1055,57 @@ void FaceAnimator::drawNeedPrompt(int eyeY, float openness) {
     }
 }
 
+// Drawn after expressions but before the HUD: every prop is kept within
+// 320x170 and only uses the existing RGB565 canvas.
+void FaceAnimator::drawAccessories(int eyeY, float openness) {
+    if (sleeping_ || openness <= 0.35f) return;
+    const int mid = width_ / 2;
+
+    if (accessories_.head == deskpet_accessories::Item::Beanie) {
+        constexpr uint16_t kWool = 0xA1DB;
+        canvas_.fillRoundRect(mid - 42, 15, 84, 27, 11, kWool);
+        canvas_.fillRoundRect(mid - 45, 34, 90, 9, 4, 0x6A38);
+        canvas_.drawLine(mid - 30, 24, mid + 30, 24, 0xD37E);
+        canvas_.fillCircle(mid, 11, 7, 0xD37E);
+    } else if (accessories_.head == deskpet_accessories::Item::PartyHat) {
+        constexpr uint16_t kParty = 0xE1DF;
+        canvas_.fillTriangle(mid - 30, 40, mid, 6, mid + 30, 40, kParty);
+        canvas_.drawLine(mid - 30, 40, mid + 30, 40, kEye);
+        canvas_.drawLine(mid - 10, 28, mid + 11, 28, 0xFE60);
+        canvas_.fillCircle(mid, 6, 5, 0xFE60);
+    }
+
+    if (accessories_.eyes == deskpet_accessories::Item::Glasses) {
+        constexpr uint16_t kFrame = 0xF6DE;
+        // Wireframes do not mask pupils, so emotions remain readable.
+        for (int side = -1; side <= 1; side += 2) {
+            const int lensX = mid + side * 62 - 39;
+            canvas_.drawRoundRect(lensX, eyeY - 38, 78, 78, 22, kFrame);
+            canvas_.drawRoundRect(lensX + 2, eyeY - 36, 74, 74, 20, kFrame);
+        }
+        canvas_.drawLine(mid - 23, eyeY - 19, mid + 23, eyeY - 19, kFrame);
+    }
+
+    if (accessories_.face == deskpet_accessories::Item::Mustache) {
+        constexpr uint16_t kHair = 0xA514;
+        const int y = eyeY + 32;
+        canvas_.fillTriangle(mid - 1, y, mid - 23, y - 2,
+                             mid - 34, y - 12, kHair);
+        canvas_.fillTriangle(mid + 1, y, mid + 23, y - 2,
+                             mid + 34, y - 12, kHair);
+        canvas_.fillCircle(mid - 9, y - 3, 5, kHair);
+        canvas_.fillCircle(mid + 9, y - 3, 5, kHair);
+    } else if (accessories_.face == deskpet_accessories::Item::BowTie) {
+        constexpr uint16_t kBow = 0xFB89;
+        const int y = eyeY + 36;
+        canvas_.fillTriangle(mid, y, mid - 23, y - 10,
+                             mid - 23, y + 10, kBow);
+        canvas_.fillTriangle(mid, y, mid + 23, y - 10,
+                             mid + 23, y + 10, kBow);
+        canvas_.fillCircle(mid, y, 5, kEye);
+    }
+}
+
 void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
     if (sleeping_ || openness < 0.35f) return;
     const int mid = width_ / 2;
@@ -1328,6 +1379,8 @@ void FaceAnimator::render(float openness) {
             }
         }
     }
+
+    drawAccessories(eyeY, openness);
 
     canvas_.fillCircle(15, 13, 4, sleeping_ ? kMuted : kAccent);
     canvas_.setTextColor(kMuted, kBackground);

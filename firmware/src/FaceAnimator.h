@@ -8,6 +8,7 @@
 #include "Personality.h"
 #include "FaceLifecycle.h"
 #include "PetNeeds.h"
+#include "AccessoryWardrobe.h"
 
 const char* emotionName(Emotion emotion);
 
@@ -41,6 +42,7 @@ public:
         attention_ = attention;
     }
     void setNeedPrompt(deskpet_needs::Kind prompt) { needPrompt_ = prompt; }
+    void setAccessories(deskpet_accessories::Outfit outfit) { accessories_ = outfit; }
 
     // Ambient gestures are visual-only: never replace the user's emotion.
     void setIdleGesture(IdleGesture gesture, uint32_t startedMs);
@@ -61,6 +63,7 @@ private:
     void drawLifecycleOverlay();
     void drawComicFeatures(int eyeY, float openness);
     void drawNeedPrompt(int eyeY, float openness);
+    void drawAccessories(int eyeY, float openness);
     float idleEnvelope() const;
     const char* quipForEmotion(Emotion emotion) const;
     static bool hasSpecialEyeShape(Emotion emotion);
@@ -124,6 +127,7 @@ private:
     uint8_t mood_ = 70u;
     uint8_t attention_ = 65u;
     deskpet_needs::Kind needPrompt_ = deskpet_needs::Kind::None;
+    deskpet_accessories::Outfit accessories_ = deskpet_accessories::emptyOutfit();
     bool sassEnabled_ = false;
     bool quipVisible_ = false;
     uint32_t quipStartedMs_ = 0;

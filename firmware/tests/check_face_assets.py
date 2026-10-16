@@ -382,5 +382,27 @@ assert "canvas_.print(attention_);" in source
 assert "void setNeedPrompt(deskpet_needs::Kind prompt)" in face_header
 assert (ROOT / "tests/pet_needs_test.cpp").is_file()
 
+wardrobe = (ROOT / "include/AccessoryWardrobe.h").read_text(encoding="utf-8")
+assert "namespace deskpet_accessories" in wardrobe
+assert "class Wardrobe" in wardrobe
+assert "inline Outfit automaticOutfit(" in wardrobe
+assert "void surprise()" in wardrobe
+assert "void tick(Emotion emotion, Personality personality," in wardrobe
+assert "if (sleeping || mode_ == Mode::Off)" in wardrobe
+assert "void equip(Item item)" in wardrobe
+assert '#include "AccessoryWardrobe.h"' in serial
+assert "deskpet_accessories::Wardrobe wardrobe;" in serial
+assert "wardrobe.tick(reactions.desiredEmotion(), ambient.personality()," in serial
+assert "face.setAccessories(wardrobe.outfit());" in serial
+assert "void FaceAnimator::drawAccessories(int eyeY, float openness)" in source
+assert "drawAccessories(eyeY, openness);" in source
+assert "deskpet_accessories::Outfit accessories_" in face_header
+assert "if (sleeping_ || openness <= 0.35f) return;" in source
+for command in ("inventory", "wear status", "wear auto", "wear on", "wear off",
+                "wear clear", "wear random", "wear beanie", "wear partyhat",
+                "wear glasses", "wear mustache", "wear bowtie"):
+    assert command in serial, f"Missing wardrobe command: {command}"
+assert (ROOT / "tests/accessory_wardrobe_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")

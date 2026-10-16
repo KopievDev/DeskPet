@@ -1,3 +1,34 @@
+## DeskPet accessories · wardrobe (16 October 2026)
+
+Five playful, zero-storage accessories across three slots: **head** (beanie, party hat), **eyes** (wireframe glasses), and **face** (mustache, bow tie). All items are available from the start; wearing a new item replaces only that slot. The auto wardrobe is enabled on boot and reacts to energy, mood, attention, chosen emotion, and Calm/Playful/Cheeky personality. It avoids duplicate Nerd glasses. Sleep hides props and restores the previous outfit on wake. Pure C++11 state and RGB565 drawing in the existing canvas; no new sprites, heap, NVS, sensors, or network use.
+
+```text
+inventory
+wear status
+wear beanie
+wear glasses
+wear mustache
+wear partyhat
+wear bowtie
+wear random
+wear clear
+wear auto
+wear off
+wear on
+```
+
+`wear auto` chooses props from pet state. Manual `wear <item>` equips an item and switches to manual mode; `wear random` assembles a reproducible local-PRNG surprise outfit. `wear off` hides props without deleting the manual outfit; `wear on` restores manual mode. All customization is RAM-only and resets on restart.
+
+Host check (run locally, CI not required):
+
+```bash
+python3 firmware/tests/check_face_assets.py
+c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/accessory_wardrobe_test.cpp -o /tmp/deskpet-wardrobe-test
+/tmp/deskpet-wardrobe-test
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+```
+
 # DeskPet 🐾
 
 Настольный робот-компаньон на **LILYGO T-Display-S3 (ESP32-S3, LCD 320 × 170)**. Цель — живой персонаж с локальной анимацией, а позднее голосом, AI-провайдерами (OpenAI / Gemini / Ollama), интеграцией с Mac, напоминаниями и умным домом.
