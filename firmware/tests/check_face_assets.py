@@ -507,5 +507,28 @@ for cmd in ("comedy status", "comedy on", "comedy off", "comedy now"):
     assert f'strcmp(command, "{cmd}")' in serial
 assert (ROOT / "tests/comedy_director_test.cpp").is_file()
 
+# Scripted comic stories: pure scheduler, no second animation controller.
+stories = (ROOT / "include/ComicStories.h").read_text(encoding="utf-8")
+assert "namespace deskpet_stories" in stories
+assert "class Director" in stories
+for kind in ("Suspicious", "Bedhead", "Meltdown"):
+    assert f"Kind::{kind}" in stories
+assert "uint8_t beatCount(Kind kind)" in stories
+assert "inline Beat beatAt(Kind kind, uint8_t index)" in stories
+assert "bool startNext(uint32_t nowMs, Beat& first)" in stories
+assert "bool tick(uint32_t nowMs, bool permitted, Beat& nextBeat)" in stories
+assert '#include "ComicStories.h"' in serial
+assert "deskpet_stories::Director stories;" in serial
+assert "void advanceComicStory(uint32_t nowMs)" in serial
+assert "advanceComicStory(now);" in serial
+assert "reactions.showTemporary(beat.emotion, nowMs, beat.durationMs);" in serial
+assert "reactions.showTemporary(first.emotion, now, first.durationMs);" in serial
+assert "comedy.count() % 3u == 0u" in serial
+for cmd in ("story status", "story next", "story stop",
+            "story auto on", "story auto off"):
+    assert f'strcmp(command, "{cmd}")' in serial
+assert (ROOT / "tests/comic_stories_test.cpp").is_file()
+assert (ROOT / "tests/comic_stories_reactions_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
