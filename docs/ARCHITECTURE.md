@@ -1,3 +1,7 @@
+## Persistent progress boundary (NVS)
+
+`PetProgress.h` is C++11-only, with a portable versioned encoder/decoder, CRC32 validation, slot selection and save scheduling. The ESP32-specific `PetProgressStorage.h` includes `Preferences.h`, writes alternating `deskpet/saveA` and `deskpet/saveB` 28-byte blobs, and loads the newest valid generation. `main.cpp` observes controller state without allocating per frame; it writes only on schedule, on explicit `save now`, or clears both records through `save reset confirm`. Runtime timers, sass, manual expressions and sleep remain ephemeral. This separation permits compiler-only tests without physical hardware.
+
 # Architecture (target, not all implemented)
 
 ```text
