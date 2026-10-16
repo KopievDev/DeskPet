@@ -17,6 +17,7 @@
 #include "PetProgress.h"
 #include "PetProgressStorage.h"
 #include "ComedyDirector.h"
+#include "ComicStories.h"
 
 namespace {
 constexpr uint8_t kUserButtonPin = 14;
@@ -55,6 +56,7 @@ IdleBehavior ambient;
 deskpet_progress::Storage saveStorage;
 deskpet_progress::Journal saveJournal;
 deskpet_comedy::Director comedy;
+deskpet_stories::Director stories;
 bool autoSaveEnabled = true;
 
 deskpet_progress::Snapshot captureProgress() {
@@ -171,6 +173,31 @@ void syncReaction(uint32_t nowMs) {
     }
 }
 
+// Keep the existing ReactionController as the sole visual owner of beats.
+// Update before ReactionController::tick to avoid a Neutral frame between acts.
+void advanceComicStory(uint32_t nowMs) {
+    if (!stories.active()) return;
+    const Emotion expected = stories.currentBeat().emotion;
+    const bool ownsReaction = reactions.reactionActive() &&
+        reactions.desiredEmotion() == expected;
+    const bool permitted = ownsReaction && !face.isSleeping() &&
+        !demoEnabled && reactions.manualEmotion() == Emotion::Neutral &&
+        userActivity.presence() != deskpet_activity::Presence::Away;
+    if (!permitted) {
+        stories.cancel();
+        if (ownsReaction) {
+            reactions.activity(nowMs);
+            syncReaction(nowMs);
+        }
+        return;
+    }
+    deskpet_stories::Beat beat = {Emotion::Neutral, 0u};
+    if (stories.tick(nowMs, true, beat)) {
+        reactions.showTemporary(beat.emotion, nowMs, beat.durationMs);
+        syncReaction(nowMs);
+    }
+}
+
 void handleUserGesture(deskpet_button::Action action, uint32_t nowMs) {
     if (action == deskpet_button::Action::None) return;
     comedy.activity(nowMs);
@@ -274,6 +301,9 @@ void showStatus() {
     Serial.print(saveStorage.ready() ? "ready" : "unavailable");
     Serial.print(autoSaveEnabled ? "/auto" : "/manual");
     Serial.print(saveJournal.dirty() ? "/dirty" : "");
+    Serial.print(" | story: ");
+    Serial.print(stories.active() ? deskpet_stories::storyName(stories.current())
+                                  : "idle");
     Serial.print(" | comedy: ");
     Serial.print(comedy.enabled() ? "on/" : "off/");
     Serial.print(comedy.count());
@@ -300,6 +330,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
         Serial.println("Emotions: neutral happy curious surprised sleepy angry sad love confused excited playful smug furious embarrassed dizzy bored bewildered nerd derp gremlin panic unibrow scruffy sideeye puffed goofy");
         Serial.println("Comic preview: comic next (Nerd, Derp, Gremlin, Panic, Unibrow, Scruffy, SideEye, Puffed, Goofy)");
         Serial.println("Idle comedy: comedy status | comedy on/off | comedy now");
+        Serial.println("Stories: story status | story next | story stop | story auto on/off");
         Serial.println("Controls: next sleep wake demo on demo off sass on sass off quip ambient on ambient off");
         Serial.println("Buttons: USER tap next; double-tap surprise; hold pet LOVE");
         Serial.println("Buttons: BOOT tap sleep/wake; hold cycle calm/playful/cheeky");
@@ -369,6 +400,60 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "save reset") == 0) {
         Serial.println("To erase progress, type: save reset confirm");
+        return;
+    }
+    if (strcmp(command, "story status") == 0) {
+        Serial.print("Story: ");
+        Serial.print(stories.active()
+            ? deskpet_stories::storyName(stories.current()) : "idle");
+        Serial.print(" | stage: ");
+        Serial.print(stories.active() ? stories.stage() + 1u : 0u);
+        Serial.print(" | played: ");
+        Serial.print(stories.played());
+        Serial.print(" | automatic: ");
+        Serial.println(stories.autoEnabled() ? "ON" : "OFF");
+        return;
+    }
+    if (strcmp(command, "story auto on") == 0 ||
+        strcmp(command, "story auto off") == 0) {
+        const bool enable = strcmp(command, "story auto on") == 0;
+        stories.setAutoEnabled(enable);
+        Serial.println(enable ? "Automatic stories ON" :
+                                "Automatic stories OFF");
+        return;
+    }
+    if (strcmp(command, "story stop") == 0) {
+        if (stories.active()) {
+            stories.cancel();
+            comedy.activity(nowMs);
+            reactions.activity(nowMs);
+            syncReaction(nowMs);
+            Serial.println("Story stopped");
+        } else {
+            Serial.println("No story running");
+        }
+        return;
+    }
+    if (strcmp(command, "story next") == 0) {
+        const bool eligible = !stories.active() && !face.isSleeping() &&
+            !demoEnabled && !reactions.reactionActive() &&
+            !reactions.idleActive() &&
+            reactions.manualEmotion() == Emotion::Neutral &&
+            reactions.desiredEmotion() == Emotion::Neutral &&
+            userActivity.presence() != deskpet_activity::Presence::Away;
+        if (!eligible) {
+            Serial.println("Story blocked: wake and choose neutral first");
+            return;
+        }
+        deskpet_stories::Beat first = {Emotion::Neutral, 0u};
+        if (stories.startNext(nowMs, first)) {
+            comedy.activity(nowMs);
+            cancelAmbient(nowMs);
+            reactions.showTemporary(first.emotion, nowMs, first.durationMs);
+            syncReaction(nowMs);
+            Serial.print("Story started: ");
+            Serial.println(deskpet_stories::storyName(stories.current()));
+        }
         return;
     }
     if (strcmp(command, "comedy status") == 0) {
