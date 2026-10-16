@@ -1,3 +1,26 @@
+## Comic Mini-Stories — multi-beat sketches (16 October 2026)
+
+DeskPet can now perform **three cartoon micro-stories** using the existing 26 facial emotions and `ReactionController`. Each story consists of timed beats, not a new animation engine:
+
+- **Suspicious** (4.6 s): `SideEye → Unibrow → Goofy`. A skeptical stare turns into an outrageous eyebrow and a toothy grin.
+- **Bedhead** (4.7 s): `Scruffy → Bewildered → Derp`. The pet wakes with a hairstyle disaster and gives up trying to look normal.
+- **Meltdown** (4.8 s): `Surprised → Panic → Puffed → Happy`. Shock, alarm, an indignant puff and a relieved smile.
+
+Every **third eligible autonomous comedy cameo** becomes a story if automatic stories are enabled. The scripts rotate in sequence, with no extra `delay`, heap allocations, or storage writes. Each beat is shown through the existing temporary-reaction interface; the final beat returns to the previously chosen `Neutral` mood. USER/BOOT, new manual moods, build results, Mac presence, sleep and demo can cancel a story. Host events immediately relinquish the face to the higher-priority system.
+
+Serial controls (start from `neutral`; requests are refused when higher-priority reactions are active):
+
+```text
+story status       # active script, current beat, played count, automatic on/off
+story next         # play the next micro-story immediately
+story stop         # cancel and restore manual Neutral
+story auto off     # keep manual preview, disable automatic multi-beat scripts
+story auto on      # re-enable automatic scripts
+comedy now         # still previews a single random funny face
+```
+
+The `ComicStories.h` director is pure C++11 and stores **no persisted gameplay state**. Test with `firmware/tests/comic_stories_test.cpp`, `firmware/tests/comic_stories_reactions_test.cpp`, `python3 firmware/tests/check_face_assets.py`, and a PlatformIO build/real-device preview. The implementation reuses the 320×170 RGB565 renderer.
+
 ## Autonomous Comic Director — idle micro-skits (16 October 2026)
 
 Alongside the 26 manual expressions, DeskPet can now initiate **short cartoon reactions on its own** while visibly idle in Neutral. The independent C++11 `ComedyDirector.h` picks among Unibrow, Scruffy, SideEye, Puffed and Goofy, avoids playing the same expression twice consecutively, and varies the selection by personality, energy, mood, attention and affection.
