@@ -152,6 +152,12 @@ inline bool newer(uint32_t a, uint32_t b) {
     return a != b && static_cast<uint32_t>(a - b) < 0x80000000u;
 }
 
+// Pick the newest valid checkpoint, including generation rollover.
+inline bool preferA(bool validA, uint32_t seqA, bool validB,
+                    uint32_t seqB) {
+    return validA && (!validB || newer(seqA, seqB));
+}
+
 // A pure scheduling policy: observe changes in loop(), write no sooner
 // than 15 s after first change, and at most once per 60 s thereafter.
 // Persisting the snapshot is the caller's responsibility.
