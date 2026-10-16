@@ -530,5 +530,22 @@ for cmd in ("story status", "story next", "story stop",
 assert (ROOT / "tests/comic_stories_test.cpp").is_file()
 assert (ROOT / "tests/comic_stories_reactions_test.cpp").is_file()
 
+# DP1 USB machine protocol for the independent macOS companion.
+wire = (ROOT / "include/DeviceProtocol.h").read_text(encoding="utf-8")
+assert "namespace deskpet_wire" in wire
+assert "kVersion = 1u" in wire
+assert "kMaxLineLength = 47u" in wire
+assert "inline bool parse(const char* line, Request& out)" in wire
+assert 'strncmp(line, "dp1 ", 4)' in wire
+assert "emotionToken(candidate)" in wire
+assert '#include "DeviceProtocol.h"' in serial
+assert "bool handleDeviceProtocol(const char* command, uint32_t nowMs)" in serial
+assert 'if (handleDeviceProtocol(command, nowMs)) return;' in serial
+assert 'Serial.println("DP1 PONG");' in serial
+assert 'Serial.print("DP1 STATUS emotion=");' in serial
+assert 'Serial.println("DP1 ERR code=bad_request");' in serial
+assert "reactions.chooseEmotion(request.emotion, nowMs);" in serial
+assert (ROOT / "tests/device_protocol_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
