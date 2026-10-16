@@ -10,7 +10,7 @@
 namespace deskpet_accessories {
 
 enum class Item : uint8_t {
-    None, Beanie, PartyHat, Glasses, Mustache, BowTie
+    None, Beanie, PartyHat, Glasses, Mustache, BowTie, Crown, Shades, StarPin
 };
 enum class Mode : uint8_t { Manual, Auto, Off };
 enum class Slot : uint8_t { Head, Eyes, Face };
@@ -33,6 +33,9 @@ inline const char* itemName(Item item) {
         case Item::Glasses: return "glasses";
         case Item::Mustache: return "mustache";
         case Item::BowTie: return "bowtie";
+        case Item::Crown: return "crown";
+        case Item::Shades: return "shades";
+        case Item::StarPin: return "starpin";
     }
     return "none";
 }
@@ -49,11 +52,14 @@ inline const char* modeName(Mode mode) {
 inline Slot slotFor(Item item) {
     switch (item) {
         case Item::Beanie:
-        case Item::PartyHat: return Slot::Head;
-        case Item::Glasses: return Slot::Eyes;
+        case Item::PartyHat:
+        case Item::Crown: return Slot::Head;
+        case Item::Glasses:
+        case Item::Shades: return Slot::Eyes;
         case Item::None:
         case Item::Mustache:
-        case Item::BowTie: return Slot::Face;
+        case Item::BowTie:
+        case Item::StarPin: return Slot::Face;
     }
     return Slot::Face;
 }
