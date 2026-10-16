@@ -476,6 +476,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "event user-idle") == 0 ||
         strcmp(command, "event user-active") == 0) {
+        const deskpet_activity::Presence previous = userActivity.presence();
         if (strcmp(command, "event user-idle") == 0) {
             userActivity.idle(nowMs);
         } else {
@@ -487,6 +488,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
                 syncReaction(nowMs);
             }
         }
+        if (previous != userActivity.presence()) comedy.activity(nowMs);
         Serial.print("Computer: ");
         Serial.println(deskpet_activity::presenceName(userActivity.presence()));
         return;
@@ -679,6 +681,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
             announceFind(finds.reward(deskpet_finds::Action::Play, nowMs), nowMs);
         }
         if (face.isSleeping()) face.setSleeping(false, nowMs);
+        comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
         reactions.showTemporary(cue.emotion, nowMs, cue.durationMs);
@@ -811,6 +814,7 @@ void handleCommand(const char* command, uint32_t nowMs) {
             Serial.println("Event ignored while DeskPet is sleeping");
             return;
         }
+        comedy.activity(nowMs);
         cancelAmbient(nowMs);
         demoEnabled = false;
         const bool success = strcmp(command, "event build-success") == 0;
