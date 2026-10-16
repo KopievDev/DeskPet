@@ -564,7 +564,12 @@ void handleCommand(const char* command, uint32_t nowMs) {
     }
     if (strcmp(command, "event user-idle") == 0 ||
         strcmp(command, "event user-active") == 0) {
-        stories.cancel();
+        if (stories.active()) {
+            // A host activity update takes ownership of the face immediately.
+            stories.cancel();
+            reactions.activity(nowMs);
+            syncReaction(nowMs);
+        }
         const deskpet_activity::Presence previous = userActivity.presence();
         if (strcmp(command, "event user-idle") == 0) {
             userActivity.idle(nowMs);
