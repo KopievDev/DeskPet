@@ -41,18 +41,18 @@ public:
 
     static uint32_t minimumInterval(Personality personality) {
         switch (personality) {
-            case Personality::Calm: return 100000u;
-            case Personality::Playful: return 55000u;
-            case Personality::Cheeky: return 70000u;
+            case Personality::Calm: return 70000u;
+            case Personality::Playful: return 42000u;
+            case Personality::Cheeky: return 50000u;
         }
         return 100000u;
     }
 
     static uint32_t maximumInterval(Personality personality) {
         switch (personality) {
-            case Personality::Calm: return 150000u;
-            case Personality::Playful: return 85000u;
-            case Personality::Cheeky: return 105000u;
+            case Personality::Calm: return 95000u;
+            case Personality::Playful: return 68000u;
+            case Personality::Cheeky: return 80000u;
         }
         return 150000u;
     }
