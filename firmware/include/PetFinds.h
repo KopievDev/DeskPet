@@ -35,6 +35,28 @@ public:
         hasFound_ = false;
     }
 
+    struct State {
+        uint8_t owned;
+        uint8_t play;
+        uint8_t pet;
+        uint8_t builds;
+    };
+
+    State state() const {
+        return {owned_, playProgress_, petProgress_, buildProgress_};
+    }
+
+    // Persistence adapter: previously earned items survive a restart.
+    // Cooldown is reset conservatively to prevent reboot reward farming.
+    void restore(State value, uint32_t nowMs) {
+        owned_ = value.owned & 7u;
+        playProgress_ = value.play > 3u ? 0u : value.play;
+        petProgress_ = value.pet > 4u ? 0u : value.pet;
+        buildProgress_ = value.builds > 2u ? 0u : value.builds;
+        hasFound_ = owned_ != 0u;
+        lastFindMs_ = nowMs;
+    }
+
     bool owns(Prize prize) const {
         return prize == Prize::None ||
                (owned_ & mask(prize)) != 0u;

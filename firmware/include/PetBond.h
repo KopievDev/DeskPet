@@ -26,6 +26,15 @@ public:
         nextComicMs_ = nowMs;
     }
 
+    // Restore saved score, not scheduler timestamps or RNG state.
+    void restore(uint8_t score, uint32_t nowMs) {
+        score_ = score > 100u ? 100u : score;
+        lastDecayMs_ = nowMs;
+        lastInteractionMs_ = nowMs - kInteractionCooldownMs;
+        nextComicMs_ = nowMs;
+        armed_ = false;
+    }
+
     uint8_t score() const { return score_; }
     bool enabled() const { return enabled_; }
 

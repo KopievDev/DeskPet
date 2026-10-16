@@ -1,3 +1,47 @@
+## Comic micro-stories — added to PR #2 (16 October 2026)
+
+- [x] Three fixed scripts: Suspicious, Bedhead, Meltdown, using 3–4 emotions each
+- [x] Pure C++11 `ComicStories.h`: one stage per tick, rollover-safe and cancellation-safe
+- [x] Integration with `ReactionController` as sole owner of temporary emotions; no extra sprite or memory allocation
+- [x] Automatic every third idle comedy cameo, with RAM-only opt-out
+- [x] Serial `story status/next/stop/auto on/auto off`; strict Neutral/sleep/host/build priority
+- [x] Host tests for durations, ordering, interrupt behavior, millis rollover and reaction priority
+- [ ] Confirm story timing, frame transitions and FPS on real LILYGO T-Display-S3
+- [ ] Consider user-editable scripts as a future independent feature
+
+## Autonomous comic micro-skits (added to PR #2, 16 October 2026)
+
+- [x] Independent C++11 comedy director, separate RNG and interrupt-safe transient scheduling
+- [x] Personality-weighted five-scene selection; also react to E/M/T and bond
+- [x] Eligible-time countdown prevents starvation by unrelated short skits
+- [x] Respect USER/BOOT, manually chosen mood, Mac-away, build events, Needs, PetBond, demo, sleep and active ambient gestures
+- [x] Return automatically to Neutral after 4.8 s; avoid repeating the same face
+- [x] Serial `comedy on/off/status/now`; status displays count and quiet-time remaining
+- [x] Deterministic host tests + source integration regression
+- [ ] Verify cameo timing, UX and 320×170 IPS legibility on hardware, and watch FPS
+- [ ] Future option: custom presets for which faces may appear automatically
+
+## Comic Expressions Pack — implemented in PR #2 (16 October 2026)
+
+- [x] Five comically exaggerated new facial moods: Unibrow, Scruffy, SideEye, Puffed, Goofy
+- [x] Dedicated eyelid, pupil and brow poses plus 4.8s deterministic cartoon beats
+- [x] New Serial commands; USER/demo now traverse 26 emotions, `comic next` previews nine
+- [x] Render using existing RGB565 sprite, respect Sleep and blink/transition priorities
+- [x] Extend emotion/source regression, cycle checks and host-testable motion bounds
+- [ ] Confirm display legibility, hat/glasses overlaps, and FPS on real LILYGO T-Display-S3
+
+## NVS progress snapshots — PR #2 (16 October 2026)
+
+- [x] Versioned 28-byte v1 checkpoint, CRC32, strict inventory and enum validation
+- [x] Alternate NVS keys so previous valid generation is recoverable
+- [x] Restore needs, affection, rare rewards/progress, manual outfit, personality
+- [x] Avoid offline decay by rebasing only in-memory timers on boot
+- [x] Autosave delayed 15 s; rate-limited 60 s; failed-write backoff
+- [x] Serial save status/on/off/now/reset confirm
+- [x] Host tests for codec, corruption, rollover, journal and controller restore
+- [ ] Test real ESP32-S3 power cycling, Flash writes and on-device UI
+- [ ] Consider version migration/export if format changes in later releases
+
 ## Collectible rare items — PR #1 (16 October 2026)
 
 - [x] Keep five starter wardrobe items freely usable.

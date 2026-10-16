@@ -1,3 +1,15 @@
+## Comic mini-story orchestration
+
+`ComicStories.h` describes immutable timed 3–4 beat scripts (Suspicious, Bedhead, Meltdown) and a zero-allocation state machine. The main loop invokes `advanceComicStory(now)` after Serial and before `ReactionController::tick(now)`, preventing a one-frame return to Neutral between beats. Each stage goes through `reactions.showTemporary(...)`, so the existing animator stays the only visual controller. USER/BOOT, build results, Mac activity and explicit manual commands cancel ownership. Auto-start happens on every third successful `ComedyDirector` idle cue, only if Neutral, awake, unoccupied and not Mac-away. A refused or interrupted scene is never queued; scripts and auto-on toggle are RAM-only and excluded from NVS.
+
+## Autonomous idle comedy (pure core + priority boundary)
+
+`firmware/include/ComedyDirector.h` is a C++11 scheduler driven from `main.cpp::loop()`, with no Arduino headers, heap or storage. When Neutral, awake and eligible after Mac activity, Needs and PetBond have had first refusal, it accrues *eligible millis* and optionally emits a 4.8-second transient reaction. The choice depends on personality + care/bond values but does not mutate them. Ambient gestures temporarily pause accumulation. `ReactionController` owns interruption and return to the manually selected Neutral. Explicit USER/BOOT, Serial emotion, new builds or presence transitions reset the quiet timer; `comedy on/off/status/now` control this feature without writing to NVS.
+
+## Persistent progress boundary (NVS)
+
+`PetProgress.h` is C++11-only, with a portable versioned encoder/decoder, CRC32 validation, slot selection and save scheduling. The ESP32-specific `PetProgressStorage.h` includes `Preferences.h`, writes alternating `deskpet/saveA` and `deskpet/saveB` 28-byte blobs, and loads the newest valid generation. `main.cpp` observes controller state without allocating per frame; it writes only on schedule, on explicit `save now`, or clears both records through `save reset confirm`. Runtime timers, sass, manual expressions and sleep remain ephemeral. This separation permits compiler-only tests without physical hardware.
+
 # Architecture (target, not all implemented)
 
 ```text

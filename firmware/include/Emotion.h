@@ -26,5 +26,10 @@ enum class Emotion : uint8_t {
     Derp,
     Gremlin,
     Panic,
+    Unibrow,
+    Scruffy,
+    SideEye,
+    Puffed,
+    Goofy,
     Count
 };

@@ -16,7 +16,7 @@ enum_match = re.search(r"enum class Emotion\s*:\s*uint8_t\s*\{(.*?)\}", header, 
 assert enum_match, "Emotion enum missing"
 emotions = re.findall(r"\b([A-Za-z]+)(?:\s*=\s*0)?\s*,", enum_match.group(1))
 emotions = [name for name in emotions if name != "Count"]
-assert len(emotions) == 21, f"Expected 21 emotions; got {len(emotions)}"
+assert len(emotions) == 26, f"Expected 26 emotions; got {len(emotions)}"
 
 for emotion in emotions:
     assert f"case Emotion::{emotion}: return" in source, f"Name missing: {emotion}"
@@ -52,7 +52,7 @@ assert "bewilderedOffset" in source, "Missing delayed pupil travel"
 assert "4800u" in source, "Missing return cycle of the drifting pupil"
 assert "mouthY + 3 + length" in source, "Missing animated drool drop"
 assert '"bewildered", Emotion::Bewildered' in serial, "Missing Serial command"
-assert "cycling all 21 emotions" in serial, "Wrong demo description"
+assert "cycling all 26 emotions" in serial, "Wrong demo description"
 
 
 reaction = (ROOT / "include/ReactionController.h").read_text(encoding="utf-8")
@@ -441,6 +441,94 @@ for item in ("Crown", "Shades", "StarPin"):
     assert f"Item::{item}" in wardrobe
     assert f"Item::{item}" in source
 assert (ROOT / "tests/pet_finds_test.cpp").is_file()
+
+progress = (ROOT / "include/PetProgress.h").read_text(encoding="utf-8")
+storage = (ROOT / "include/PetProgressStorage.h").read_text(encoding="utf-8")
+assert "struct Snapshot" in progress
+assert "kVersion = 1u" in progress
+assert "kWireSize = 28u" in progress
+assert "uint32_t checksum(" in progress
+assert "inline bool decode(" in progress
+assert "class Journal" in progress
+assert "kMinWriteIntervalMs = 60000u" in progress
+assert "class Storage" in storage
+assert "prefs_.putBytes(" in storage
+assert '"saveA"' in storage and '"saveB"' in storage
+assert "bool clear()" in storage
+assert "deskpet_progress::Storage saveStorage;" in serial
+assert "deskpet_progress::Journal saveJournal;" in serial
+assert "restoreProgress(restored, startedAt)" in serial
+assert "saveJournal.begin(captureProgress(), startedAt, loaded)" in serial
+assert "autoSaveProgress(now);" in serial
+assert 'strcmp(command, "save status")' in serial
+assert 'strcmp(command, "save now")' in serial
+assert 'strcmp(command, "save reset confirm")' in serial
+assert (ROOT / "tests/pet_progress_test.cpp").is_file()
+assert (ROOT / "tests/pet_progress_restore_test.cpp").is_file()
+
+# New cartoon faces: separate state curves, full Serial/USER/demo coverage.
+funny = (ROOT / "include/ComicExpressions.h").read_text(encoding="utf-8")
+assert "kSceneDurationMs = 4800u" in funny
+assert "inline Frame at(Emotion emotion, uint32_t elapsedMs)" in funny
+assert '#include "ComicExpressions.h"' in source
+assert "deskpet_comic_faces::at(" in source
+assert "const bool sideEye = visualEmotion_ == Emotion::SideEye;" in source
+assert "const bool goofy = visualEmotion_ == Emotion::Goofy;" in source
+for mood in ("Unibrow", "Scruffy", "SideEye", "Puffed", "Goofy"):
+    assert f"case Emotion::{mood}:" in funny, f"Missing animation: {mood}"
+    assert f"case Emotion::{mood}:" in source, f"Missing eye/brow pose: {mood}"
+    assert f"visualEmotion_ == Emotion::{mood}" in source, (
+        f"Missing on-screen details: {mood}"
+    )
+    assert f'Emotion::{mood}' in serial, f"Missing Serial mapping: {mood}"
+assert "sizeof(comicMoods) / sizeof(comicMoods[0])" in serial
+assert (ROOT / "tests/comic_expressions_test.cpp").is_file()
+
+# Autonomous comedy director: pure C++11, lower priority than host/needs/bond
+# and never allowed to replace a manual mood or sleep.
+director = (ROOT / "include/ComedyDirector.h").read_text(encoding="utf-8")
+assert "namespace deskpet_comedy" in director
+assert "class Director" in director
+assert "kSceneDurationMs = 4800u" in director
+assert "void setPersonality(Personality personality, uint32_t nowMs)" in director
+assert "elapsedEligibleMs_ += delta;" in director
+assert "if (!enabled_ || !eligible)" in director
+assert "kChoices[i] == lastEmotion_" in director
+assert "bool preview(uint32_t nowMs, Personality personality," in director
+assert '#include "ComedyDirector.h"' in serial
+assert "deskpet_comedy::Director comedy;" in serial
+assert "comedy.begin(startedAt," in serial
+assert "const bool allowComedy = allowBond && !reactions.reactionActive() &&" in serial
+assert "!ambient.isActive() &&" in serial
+assert "comedy.tick(now, allowComedy, ambient.personality()," in serial
+assert "reactions.showTemporary(idleComedy.emotion, now," in serial
+assert "comedy.setPersonality(next, nowMs);" in serial
+for cmd in ("comedy status", "comedy on", "comedy off", "comedy now"):
+    assert f'strcmp(command, "{cmd}")' in serial
+assert (ROOT / "tests/comedy_director_test.cpp").is_file()
+
+# Scripted comic stories: pure scheduler, no second animation controller.
+stories = (ROOT / "include/ComicStories.h").read_text(encoding="utf-8")
+assert "namespace deskpet_stories" in stories
+assert "class Director" in stories
+for kind in ("Suspicious", "Bedhead", "Meltdown"):
+    assert f"Kind::{kind}" in stories
+assert "uint8_t beatCount(Kind kind)" in stories
+assert "inline Beat beatAt(Kind kind, uint8_t index)" in stories
+assert "bool startNext(uint32_t nowMs, Beat& first)" in stories
+assert "bool tick(uint32_t nowMs, bool permitted, Beat& nextBeat)" in stories
+assert '#include "ComicStories.h"' in serial
+assert "deskpet_stories::Director stories;" in serial
+assert "void advanceComicStory(uint32_t nowMs)" in serial
+assert "advanceComicStory(now);" in serial
+assert "reactions.showTemporary(beat.emotion, nowMs, beat.durationMs);" in serial
+assert "reactions.showTemporary(first.emotion, now, first.durationMs);" in serial
+assert "comedy.count() % 3u == 0u" in serial
+for cmd in ("story status", "story next", "story stop",
+            "story auto on", "story auto off"):
+    assert f'strcmp(command, "{cmd}")' in serial
+assert (ROOT / "tests/comic_stories_test.cpp").is_file()
+assert (ROOT / "tests/comic_stories_reactions_test.cpp").is_file()
 
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")

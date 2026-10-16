@@ -5,6 +5,7 @@
 #include "FuryGlow.h"
 #include "EmotionParticles.h"
 #include "ComicSkits.h"
+#include "ComicExpressions.h"
 
 #include <math.h>
 
@@ -50,6 +51,11 @@ const char* emotionName(Emotion emotion) {
         case Emotion::Derp: return "DERP";
         case Emotion::Gremlin: return "GREMLIN";
         case Emotion::Panic: return "PANIC";
+        case Emotion::Unibrow: return "UNIBROW";
+        case Emotion::Scruffy: return "SCRUFFY";
+        case Emotion::SideEye: return "SIDE EYE";
+        case Emotion::Puffed: return "PUFFED";
+        case Emotion::Goofy: return "GOOFY";
         case Emotion::Count: break;
     }
     return "UNKNOWN";
@@ -193,6 +199,11 @@ const char* FaceAnimator::quipForEmotion(Emotion emotion) const {
         case Emotion::Derp: return u8"ЧЕГО?!";
         case Emotion::Gremlin: return u8"ХЕ-ХЕ, ПОПАЛ!";
         case Emotion::Panic: return u8"НУ ВСЕ, БЛ#!!";
+        case Emotion::Unibrow: return u8"ЭЙ, ТЫ ЧЕ?";
+        case Emotion::Scruffy: return u8"ОЙ, БЛИН...";
+        case Emotion::SideEye: return u8"ЧЕГО?!";
+        case Emotion::Puffed: return u8"НУ И СКУКА";
+        case Emotion::Goofy: return u8"ХЕ-ХЕ, ПОПАЛ!";
         case Emotion::Count: break;
     }
     return nullptr;
@@ -393,6 +404,32 @@ FaceAnimator::EyePose FaceAnimator::targetEyePose(Emotion emotion, bool isLeft) 
         case Emotion::Panic:
             pose.width = 66.0f; pose.height = 79.0f;
             pose.pupilRadius = 11.0f;
+            break;
+        case Emotion::Unibrow:
+            pose.openness = 0.83f;
+            pose.pupilRadius = 14.0f;
+            pose.width = 71.0f;
+            break;
+        case Emotion::Scruffy:
+            pose.openness = isLeft ? 0.95f : 0.72f;
+            pose.pupilRadius = isLeft ? 18.0f : 11.0f;
+            if (!isLeft) pose.lidRight = 8.0f;
+            break;
+        case Emotion::SideEye:
+            pose.openness = isLeft ? 0.61f : 0.76f;
+            pose.pupilRadius = 13.0f;
+            pose.lidLeft = 6.0f;
+            pose.lidRight = 4.0f;
+            break;
+        case Emotion::Puffed:
+            pose.width = 69.0f;
+            pose.openness = 0.85f;
+            pose.pupilRadius = 16.0f;
+            break;
+        case Emotion::Goofy:
+            pose.width = isLeft ? 72.0f : 66.0f;
+            pose.openness = isLeft ? 0.96f : 0.85f;
+            pose.pupilRadius = isLeft ? 13.0f : 19.0f;
             break;
     }
     return pose;
@@ -601,6 +638,31 @@ void FaceAnimator::animateBrows() {
                 slope[0] = -6.0f; slope[1] = 6.0f;
                 arch[0] = arch[1] = 5.0f;
                 break;
+            case Emotion::Unibrow:
+                y[0] = y[1] = 42.0f;
+                slope[0] = -2.0f; slope[1] = 2.0f;
+                arch[0] = arch[1] = 1.0f;
+                break;
+            case Emotion::Scruffy:
+                y[0] = 36.0f; y[1] = 51.0f;
+                slope[0] = -9.0f; slope[1] = 6.0f;
+                arch[0] = 5.0f; arch[1] = 1.0f;
+                break;
+            case Emotion::SideEye:
+                y[0] = 49.0f; y[1] = 45.0f;
+                slope[0] = 3.0f; slope[1] = -5.0f;
+                arch[0] = arch[1] = 1.0f;
+                break;
+            case Emotion::Puffed:
+                y[0] = y[1] = 41.0f;
+                slope[0] = -4.0f; slope[1] = 4.0f;
+                arch[0] = arch[1] = 6.0f;
+                break;
+            case Emotion::Goofy:
+                y[0] = 50.0f; y[1] = 34.0f;
+                slope[0] = 8.0f; slope[1] = -8.0f;
+                arch[0] = 2.0f; arch[1] = 7.0f;
+                break;
             case Emotion::Neutral:
             case Emotion::Count:
                 break;
@@ -753,6 +815,8 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
     const bool gremlin = visualEmotion_ == Emotion::Gremlin;
     const bool panic = visualEmotion_ == Emotion::Panic;
     const bool bewildered = visualEmotion_ == Emotion::Bewildered;
+    const bool sideEye = visualEmotion_ == Emotion::SideEye;
+    const bool goofy = visualEmotion_ == Emotion::Goofy;
 
     // A gentle vertical stretch as the pet wakes up; the actual eye
     // opening is still controlled by the lifecycle state machine.
@@ -846,9 +910,13 @@ void FaceAnimator::drawEye(int centerX, int centerY, float openness, bool isLeft
         }
         const deskpet_comics::Frame skit = deskpet_comics::at(
             visualEmotion_, animationNowMs_ - emotionStartedMs_);
+        const deskpet_comic_faces::Frame funny = deskpet_comic_faces::at(
+            visualEmotion_, animationNowMs_ - emotionStartedMs_);
         int lookOffset = (derp || gremlin || panic)
             ? (isLeft ? skit.leftPupil : skit.rightPupil)
             : bewildered ? bewilderedOffset
+            : sideEye ? funny.gaze
+            : goofy ? (isLeft ? -funny.gaze : funny.gaze)
             : confused ? (isLeft ? -8 : 7)
             : surprised ? static_cast<int>(clampFloat(gazeX_, -8.0f, 8.0f))
             : (bored || smug) ? (isLeft ? -6 : 8)
@@ -1227,6 +1295,68 @@ void FaceAnimator::drawComicFeatures(int eyeY, float openness) {
             canvas_.fillTriangle(sweatX, sweatY - 4,
                                  sweatX - 5, sweatY + 6,
                                  sweatX + 5, sweatY + 6, sweat);
+        }
+    } else {
+        const deskpet_comic_faces::Frame beat = deskpet_comic_faces::at(
+            visualEmotion_, animationNowMs_ - emotionStartedMs_);
+        if (visualEmotion_ == Emotion::Unibrow) {
+            // A shaggy, continuous cartoon brow; the inner gap is filled.
+            // Short random-looking fringe is deterministic, not an RNG call.
+            const int browY = 40 + beat.brow / 2;
+            constexpr uint16_t kHair = 0xBD75;
+            for (int dx = -87; dx <= 87; dx += 3) {
+                const int curve = (dx * dx) / 2200;
+                const int y = browY + curve + ((dx + 90) / 9 % 3);
+                canvas_.fillCircle(mid + dx, y, 3, kHair);
+                if ((dx + 87) % 9 == 0) {
+                    canvas_.drawLine(mid + dx, y + 1,
+                                     mid + dx + 2, y + 5, kHair);
+                }
+            }
+            canvas_.drawLine(mid - 13, eyeY + 33,
+                             mid + 12, eyeY + 31 + beat.jaw, kMuted);
+        } else if (visualEmotion_ == Emotion::Scruffy) {
+            // Four wind-blown spikes on both sides, above the eye silhouettes.
+            constexpr uint16_t kTuft = 0xD5DB;
+            for (int side = -1; side <= 1; side += 2) {
+                for (int spike = 0; spike < 4; ++spike) {
+                    const int x = mid + side * (44 + spike * 17);
+                    const int baseY = 43 + (spike % 2) * 3;
+                    const int tipY = 20 - beat.tuft / 2 + (spike % 3) * 3;
+                    canvas_.drawLine(x - 5, baseY, x, tipY, kTuft);
+                    canvas_.drawLine(x, tipY, x + 5, baseY, kTuft);
+                }
+            }
+            canvas_.fillRoundRect(mid - 13, eyeY + 29,
+                                  26, 8 + beat.jaw, 4, kPupil);
+            canvas_.fillRect(mid - 6, eyeY + 30, 8, 7, kEye);
+        } else if (visualEmotion_ == Emotion::SideEye) {
+            // Suspicious stare: pupils track left while a tiny lip twitches.
+            canvas_.drawLine(mid - 12, eyeY + 33,
+                             mid + 8, eyeY + 30 - beat.brow, kMuted);
+            canvas_.fillCircle(mid + 10, eyeY + 30 - beat.brow, 2, kAccent);
+            canvas_.drawLine(mid - 2, eyeY + 25,
+                             mid + 1, eyeY + 23, kMuted);
+        } else if (visualEmotion_ == Emotion::Puffed) {
+            // Balloon cheeks stay in both outer gutters, above the HUD.
+            const int radius = 7 + beat.cheeks;
+            for (int side = -1; side <= 1; side += 2) {
+                const int x = mid + side * 115;
+                canvas_.fillCircle(x, eyeY + 23, radius, 0xC3B8);
+                canvas_.drawCircle(x, eyeY + 23, radius, 0xFB9B);
+                canvas_.fillCircle(x - 2, eyeY + 19, 2, 0xFDDD);
+            }
+            canvas_.drawCircle(mid, eyeY + 33, 4 + beat.jaw, kMuted);
+            canvas_.fillCircle(mid, eyeY + 33, 2, kPupil);
+        } else if (visualEmotion_ == Emotion::Goofy) {
+            // Giant open grin with one too-big tooth and a waggling tongue.
+            canvas_.fillRoundRect(mid - 19, eyeY + 27, 38,
+                                  17 + beat.jaw, 7, kPupil);
+            canvas_.fillRect(mid - 13, eyeY + 28, 12, 11, kEye);
+            canvas_.drawLine(mid - 1, eyeY + 28, mid - 1,
+                             eyeY + 39, kBackground);
+            canvas_.fillRoundRect(mid + 3, eyeY + 37, 12,
+                                  5 + beat.jaw / 2, 3, 0xFB53);
         }
     }
 }

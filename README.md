@@ -1,3 +1,105 @@
+## Comic Mini-Stories — multi-beat sketches (16 October 2026)
+
+DeskPet can now perform **three cartoon micro-stories** using the existing 26 facial emotions and `ReactionController`. Each story consists of timed beats, not a new animation engine:
+
+- **Suspicious** (4.6 s): `SideEye → Unibrow → Goofy`. A skeptical stare turns into an outrageous eyebrow and a toothy grin.
+- **Bedhead** (4.7 s): `Scruffy → Bewildered → Derp`. The pet wakes with a hairstyle disaster and gives up trying to look normal.
+- **Meltdown** (4.8 s): `Surprised → Panic → Puffed → Happy`. Shock, alarm, an indignant puff and a relieved smile.
+
+Every **third eligible autonomous comedy cameo** becomes a story if automatic stories are enabled. The scripts rotate in sequence, with no extra `delay`, heap allocations, or storage writes. Each beat is shown through the existing temporary-reaction interface; the final beat returns to the previously chosen `Neutral` mood. USER/BOOT, new manual moods, build results, Mac presence, sleep and demo can cancel a story. Host events immediately relinquish the face to the higher-priority system.
+
+Serial controls (start from `neutral`; requests are refused when higher-priority reactions are active):
+
+```text
+story status       # active script, current beat, played count, automatic on/off
+story next         # play the next micro-story immediately
+story stop         # cancel and restore manual Neutral
+story auto off     # keep manual preview, disable automatic multi-beat scripts
+story auto on      # re-enable automatic scripts
+comedy now         # still previews a single random funny face
+```
+
+The `ComicStories.h` director is pure C++11 and stores **no persisted gameplay state**. Test with `firmware/tests/comic_stories_test.cpp`, `firmware/tests/comic_stories_reactions_test.cpp`, `python3 firmware/tests/check_face_assets.py`, and a PlatformIO build/real-device preview. The implementation reuses the 320×170 RGB565 renderer.
+
+## Autonomous Comic Director — idle micro-skits (16 October 2026)
+
+Alongside the 26 manual expressions, DeskPet can now initiate **short cartoon reactions on its own** while visibly idle in Neutral. The independent C++11 `ComedyDirector.h` picks among Unibrow, Scruffy, SideEye, Puffed and Goofy, avoids playing the same expression twice consecutively, and varies the selection by personality, energy, mood, attention and affection.
+
+The director counts only **eligible awake/Neutral time**. Calm takes roughly **70–95 seconds**, Playful **42–68 seconds**, and Cheeky **50–80 seconds** (excluding higher-priority activity). Short needs/bond/computer/idle-gesture interruptions *pause* the countdown instead of losing all progress. It never interrupts explicit USER/BOOT input, an active build result, manual emotion, sleep, demo, a Mac-away scene or other temporary animation. A cameo uses `ReactionController::showTemporary(..., 4800)` and automatically returns to Neutral. A new user action cancels it immediately.
+
+```text
+neutral          # choose the idle baseline first
+comedy status    # current on/off, cameo count, previous act, quiet-time remaining
+comedy now       # explicit preview; still respects priority and refuses while busy
+comedy off       # disable automatic comedy; manual emotion commands still work
+comedy on        # enable automatic comedy
+```
+
+The scheduling state and on/off toggle are **RAM-only**, not part of NVS progress; default on after reboot. The five facial geometries are rendered by existing RGB565 canvas primitives with no additional sprites, allocations, timers or network connections. Tests: `firmware/tests/comedy_director_test.cpp` (determinism, weighted selection, non-repeating faces, suspended time, manual preview, rollover) and updated source-level regression.
+
+## Comic Expressions Pack — 26 faces (16 October 2026)
+
+Five new playful cartoon faces have been added to the existing 21 expressions. They are deliberately exaggerated *fictional* characters, not depictions of an ethnicity.
+
+- **UNIBROW** (`unibrow`): huge joined, shaggy eyebrow with waggling bristles and an uncertain frown
+- **SCRUFFY** (`scruffy`): windblown spikes, mismatched eyes, floppy jaw and one oversized tooth
+- **SIDE EYE** (`sideeye`): narrow suspicious stare drifting sideways and a skeptical twitching lip
+- **PUFFED** (`puffed`): puffed cartoon cheeks and a comically tiny pursed mouth
+- **GOOFY** (`goofy`): mismatched pupils and a wide bucktoothed, tongue-wagging grin
+
+All appear in the **USER tap cycle**, `demo on` (26 total) and `comic next` (the nine comic moods). Each has a 4.8-second deterministic choreography, driven by `millis()`, sampled from host-testable `ComicExpressions.h`. Shapes are drawn with the existing RGB565 canvas on the 320×170 IPS, without extra sprites, heap, RNG or blocking delays. Existing sleep, natural blink, timed reactions, build comedy and opt-in-only `sass` remain unchanged. The temporary facial expression is not saved by the NVS persistence feature in this PR.
+
+```text
+unibrow
+scruffy
+sideeye
+puffed
+goofy
+comic next
+demo on
+demo off
+```
+
+Host test: `c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/comic_expressions_test.cpp -o /tmp/deskpet-comic-faces-test && /tmp/deskpet-comic-faces-test`. Also run `python3 firmware/tests/check_face_assets.py` and the ordinary firmware PlatformIO build on Mac.
+
+## NVS persistence (ESP32-S3 · 16 October 2026)
+
+DeskPet now remembers its **game progress** when power is unplugged. Persisted data: affection (bond), energy/mood/attention and their enabled switches, rare accessory unlocks and partial play/pet/build reward counters, wardrobe mode and manual outfit, and personality (Calm/Playful/Cheeky).
+
+The format is **v1**, 28 bytes, with a `DPET` magic header, length, monotonically increasing generation, CRC32 and validation. Two alternating `Preferences` keys in NVS (`saveA`/`saveB` in namespace `deskpet`) preserve an older valid snapshot in case of interrupted/corrupt writes. Unsupported versions or invalid entries revert to defaults rather than injecting malformed game state.
+
+**Write policy:** the firmware observes changed gameplay fields in `loop()`, waits at least 15 seconds after the first change, and writes no more than once per 60 seconds during normal autosave. Failed writes retry after at least five seconds without shortening the rate limit. Abrupt power loss can lose the latest *unsaved* progress. No timers are replayed for time spent disconnected.
+
+Deliberately not saved: the current animation, sleep state, manually selected emotion, temporary skits, Mac activity, `sass` (always off after reboot), and RNG seeds.
+
+```text
+save status            # NVS available? auto on/off? saved copy? pending changes?
+save on                # enable automatic writes
+save off               # suspend automatic writes
+save now               # force a checkpoint for current gameplay state
+save reset             # show confirmation help
+save reset confirm     # erase both saved copies and reset gameplay in RAM
+```
+
+Local checks:
+
+```bash
+git pull --ff-only
+python3 firmware/tests/check_face_assets.py
+for test in firmware/tests/*_test.cpp; do
+  name=$(basename "$test" .cpp)
+  c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include "$test" -o "/tmp/$name" || exit 1
+  "/tmp/$name" || exit 1
+done
+pio run -d firmware -e tdisplay_s3
+pio run -d firmware -e tdisplay_s3 -t upload
+pio device monitor -d firmware -b 115200
+# Serial: needs set 11 22 33 / wear beanie / save now
+# Disconnect and reconnect power, then: status / save status
+```
+
+Historical descriptions below that say "RAM only" describe pre-persistence development stages. They no longer apply to the saved game fields described above.
+
 ## Collectible rare accessories — 16 October 2026
 
 DeskPet keeps **five starting items** (beanie, party hat, glasses, mustache and bow tie) and now has **three unlockable rares**: a golden crown, dark shades and a golden star pin. All progress lives in RAM and resets on restart; no NVS, account, or network access.
