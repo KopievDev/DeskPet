@@ -1,3 +1,15 @@
+## NVS progress snapshots — PR #2 (16 October 2026)
+
+- [x] Versioned 28-byte v1 checkpoint, CRC32, strict inventory and enum validation
+- [x] Alternate NVS keys so previous valid generation is recoverable
+- [x] Restore needs, affection, rare rewards/progress, manual outfit, personality
+- [x] Avoid offline decay by rebasing only in-memory timers on boot
+- [x] Autosave delayed 15 s; rate-limited 60 s; failed-write backoff
+- [x] Serial save status/on/off/now/reset confirm
+- [x] Host tests for codec, corruption, rollover, journal and controller restore
+- [ ] Test real ESP32-S3 power cycling, Flash writes and on-device UI
+- [ ] Consider version migration/export if format changes in later releases
+
 ## Collectible rare items — PR #1 (16 October 2026)
 
 - [x] Keep five starter wardrobe items freely usable.
