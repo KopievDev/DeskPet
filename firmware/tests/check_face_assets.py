@@ -484,5 +484,28 @@ for mood in ("Unibrow", "Scruffy", "SideEye", "Puffed", "Goofy"):
 assert "sizeof(comicMoods) / sizeof(comicMoods[0])" in serial
 assert (ROOT / "tests/comic_expressions_test.cpp").is_file()
 
+# Autonomous comedy director: pure C++11, lower priority than host/needs/bond
+# and never allowed to replace a manual mood or sleep.
+director = (ROOT / "include/ComedyDirector.h").read_text(encoding="utf-8")
+assert "namespace deskpet_comedy" in director
+assert "class Director" in director
+assert "kSceneDurationMs = 4800u" in director
+assert "void setPersonality(Personality personality, uint32_t nowMs)" in director
+assert "elapsedEligibleMs_ += delta;" in director
+assert "if (!enabled_ || !eligible)" in director
+assert "kChoices[i] == lastEmotion_" in director
+assert "bool preview(uint32_t nowMs, Personality personality," in director
+assert '#include "ComedyDirector.h"' in serial
+assert "deskpet_comedy::Director comedy;" in serial
+assert "comedy.begin(startedAt," in serial
+assert "const bool allowComedy = allowBond && !reactions.reactionActive() &&" in serial
+assert "!ambient.isActive() &&" in serial
+assert "comedy.tick(now, allowComedy, ambient.personality()," in serial
+assert "reactions.showTemporary(idleComedy.emotion, now," in serial
+assert "comedy.setPersonality(next, nowMs);" in serial
+for cmd in ("comedy status", "comedy on", "comedy off", "comedy now"):
+    assert f'strcmp(command, "{cmd}")' in serial
+assert (ROOT / "tests/comedy_director_test.cpp").is_file()
+
 print(f"PASS: {len(emotions)} emotions, {len(phrases)} Russian phrases, "
       f"{len(glyphs)} font glyphs; sass opt-in and Serial controls")
