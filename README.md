@@ -1,3 +1,28 @@
+## Comic Expressions Pack — 26 faces (16 October 2026)
+
+Five new playful cartoon faces have been added to the existing 21 expressions. They are deliberately exaggerated *fictional* characters, not depictions of an ethnicity.
+
+- **UNIBROW** (`unibrow`): huge joined, shaggy eyebrow with waggling bristles and an uncertain frown
+- **SCRUFFY** (`scruffy`): windblown spikes, mismatched eyes, floppy jaw and one oversized tooth
+- **SIDE EYE** (`sideeye`): narrow suspicious stare drifting sideways and a skeptical twitching lip
+- **PUFFED** (`puffed`): puffed cartoon cheeks and a comically tiny pursed mouth
+- **GOOFY** (`goofy`): mismatched pupils and a wide bucktoothed, tongue-wagging grin
+
+All appear in the **USER tap cycle**, `demo on` (26 total) and `comic next` (the nine comic moods). Each has a 4.8-second deterministic choreography, driven by `millis()`, sampled from host-testable `ComicExpressions.h`. Shapes are drawn with the existing RGB565 canvas on the 320×170 IPS, without extra sprites, heap, RNG or blocking delays. Existing sleep, natural blink, timed reactions, build comedy and opt-in-only `sass` remain unchanged. The temporary facial expression is not saved by the NVS persistence feature in this PR.
+
+```text
+unibrow
+scruffy
+sideeye
+puffed
+goofy
+comic next
+demo on
+demo off
+```
+
+Host test: `c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/tests/comic_expressions_test.cpp -o /tmp/deskpet-comic-faces-test && /tmp/deskpet-comic-faces-test`. Also run `python3 firmware/tests/check_face_assets.py` and the ordinary firmware PlatformIO build on Mac.
+
 ## NVS persistence (ESP32-S3 · 16 October 2026)
 
 DeskPet now remembers its **game progress** when power is unplugged. Persisted data: affection (bond), energy/mood/attention and their enabled switches, rare accessory unlocks and partial play/pet/build reward counters, wardrobe mode and manual outfit, and personality (Calm/Playful/Cheeky).
