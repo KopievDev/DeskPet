@@ -1,3 +1,12 @@
+## Comic Expressions Pack — implemented in PR #2 (16 October 2026)
+
+- [x] Five comically exaggerated new facial moods: Unibrow, Scruffy, SideEye, Puffed, Goofy
+- [x] Dedicated eyelid, pupil and brow poses plus 4.8s deterministic cartoon beats
+- [x] New Serial commands; USER/demo now traverse 26 emotions, `comic next` previews nine
+- [x] Render using existing RGB565 sprite, respect Sleep and blink/transition priorities
+- [x] Extend emotion/source regression, cycle checks and host-testable motion bounds
+- [ ] Confirm display legibility, hat/glasses overlaps, and FPS on real LILYGO T-Display-S3
+
 ## NVS progress snapshots — PR #2 (16 October 2026)
 
 - [x] Versioned 28-byte v1 checkpoint, CRC32, strict inventory and enum validation
